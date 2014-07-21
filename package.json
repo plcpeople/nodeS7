@@ -13,6 +13,10 @@
 	"RFC1006",
 	"iso-on-tcp"  
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/plcpeople/nodeS7"
+  }
   "main": "nodeS7.js",
   "dependencies": {
     "underscore": "1.4.x"
