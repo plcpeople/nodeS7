@@ -1,5 +1,5 @@
 {
-  "name": "nodeS7",
+  "name": "nodes7",
   "description": "Routine to communicate with Siemens S7 PLCs",
   "version": "0.1.0",
   "author": {
@@ -16,7 +16,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/plcpeople/nodeS7"
-  }
+  },
   "main": "nodeS7.js",
   "dependencies": {
     "underscore": "1.4.x"
