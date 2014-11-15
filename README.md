@@ -22,12 +22,12 @@ Credit to the S7 Wireshark dissector plugin for help understanding why things we
 
 To get started:
 
-	npm install nodeS7
+	npm install nodes7
 
 Example usage:
 
-	var nodeS7 = require('nodeS7');
-	var conn = new nodeS7;
+	var nodes7 = require('nodes7');
+	var conn = new nodes7;
 	var doneReading = false;
 	var doneWriting = false;
 
@@ -83,7 +83,7 @@ Example usage:
  - [readAllItems()](#read-all-items)
 
 
-#### <a name="initiate-connection"></a>nodeS7.initiateConnection(params, callback)
+#### <a name="initiate-connection"></a>nodes7.initiateConnection(params, callback)
 Connects to a PLC.  
 
 params should be an object with the following keys:
@@ -95,13 +95,13 @@ params should be an object with the following keys:
 `callback(err)` will be executed on success or failure.  err is either an error object, or undefined on successful connection.
 
 
-#### <a name="drop-connection"></a>nodeS7.dropConnection()
+#### <a name="drop-connection"></a>nodes7.dropConnection()
 Disconnects from a PLC.  
 
 This simply terminates the TCP connection.
 
 
-#### <a name="set-translation-cb"></a>nodeS7.setTranslationCB(translator)
+#### <a name="set-translation-cb"></a>nodes7.setTranslationCB(translator)
 Sets a callback for name - address translation.  
 
 This is optional - you can choose to use "addItem" etc with absolute addresses.
@@ -117,23 +117,23 @@ If you use it, `translator` should be a function that takes a string as an argum
 In the example above, an object is declared and the `translator` references that object.  It could just as reference a file or database.  In any case, it allows cleaner Javascript code to be written that refers to a name instead of an absolute address.  
 
 
-#### <a name="add-items"></a>nodeS7.addItems(items)
+#### <a name="add-items"></a>nodes7.addItems(items)
 Adds `items` to the internal read polling list.  
 
 `items` can be a string or an array of strings.
 
-#### <a name="remove-items"></a>nodeS7.removeItems(items)
+#### <a name="remove-items"></a>nodes7.removeItems(items)
 Removes `items` to the internal read polling list.  
 
 `items` can be a string or an array of strings.
 
-#### <a name="write-items"></a>nodeS7.writeItems(items, values)
+#### <a name="write-items"></a>nodes7.writeItems(items, values)
 Writes `items` to the PLC using the corresponding `values`.  
 
 `items` can be a string or an array of strings.  If `items` is a single string, `values` should then be a single item (or an array if `items` is an array item).  If `items` is an array of strings, `values` must be an array.
 
 
-#### <a name="read-all-items"></a>nodeS7.readAllItems(callback)
+#### <a name="read-all-items"></a>nodes7.readAllItems(callback)
 Reads the internal polling list and calls `callback` when done.  
 
 `callback(err, values)` is called with two arguments - a boolean indicating if ANY of the items have "bad quality", and `values`, an object containing the values being read as keys and their value (from the PLC) as the value.
