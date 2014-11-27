@@ -107,8 +107,9 @@ Sets a callback for name - address translation.
 This is optional - you can choose to use "addItem" etc with absolute addresses.
 
 If you use it, `translator` should be a function that takes a string as an argument, and returns a string in the following format:
-- <data block number.><memory area><data type><byte offset><.array length>
-- Examples:
+`<data block number.><memory area><data type><byte offset><.array length>`
+
+Examples:
 - MR30 - MD30 as REAL
 - DB10,INT6 - DB10.DBW6 as INT
 - DB10,INT6.2 - DB10.DBW6 and DB10.DBW8 in an array with length 2
