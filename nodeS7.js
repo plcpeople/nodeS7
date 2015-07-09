@@ -378,6 +378,8 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 NodeS7.prototype.findItem = function(useraddr) {
 	var self = this
 	  , i;
+	var commstate = { value: self.isoConnectionState !== 4, quality: 'OK' };
+	if (useraddr === '_COMMERR') { return commstate; }
 	for (i = 0; i < self.polledReadBlockList.length; i++) {
 		if (self.polledReadBlockList[i].useraddr === useraddr) { return self.polledReadBlockList[i]; } 
 	}
@@ -394,11 +396,11 @@ NodeS7.prototype.addItemsNow = function(arg) {
 	  , i;
 	outputLog("Adding " + arg,0,self.connectionID);
 	addItemsFlag = false;
-	if (typeof arg === "string") { 
+	if (typeof(arg) === "string" && arg !== "_COMMERR") { 
 		self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
 	} else if (_.isArray(arg)) {
 		for (i = 0; i < arg.length; i++) {
-			if (typeof arg[i] === "string") {
+			if (typeof(arg[i]) === "string" && arg[i] !== "_COMMERR") {
 				self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
 			}
 		}
@@ -1793,6 +1795,9 @@ function bufferizeS7Item(theItem) {
 function stringToS7Addr(addr, useraddr) {
 	"use strict";
 	var theItem, splitString, splitString2;
+
+	if (useraddr === '_COMMERR') { return undefined; } // Special-case for communication error status - this variable returns true when there is a communications error
+
 	theItem = new S7Item();
 	splitString = addr.split(',');
 	if (splitString.length === 0 || splitString.length > 2) {

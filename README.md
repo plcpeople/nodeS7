@@ -123,6 +123,8 @@ Adds `items` to the internal read polling list.
 
 `items` can be a string or an array of strings.
 
+If `items` includes the value `_COMMERR` it will return current communication status.
+
 #### <a name="remove-items"></a>nodes7.removeItems(items)
 Removes `items` to the internal read polling list.  
 
