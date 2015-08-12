@@ -177,10 +177,13 @@ NodeS7.prototype.packetTimeout = function (packetType, packetSeqNum) {
 	}
 	if (packetType === "PDU") {
 		outputLog("TIMED OUT waiting for PDU reply packet from PLC - Disconnecting");
-		self.isoclient.end();
+		outputLog("Wait for 2 seconds then try again.",0,self.connectionID);		
+		self.connectionReset();
+		outputLog("Scheduling a reconnect from packetTimeout, connect type",0,self.connectionID);
 		setTimeout(function(){
-      self.connectNow.apply(self,arguments);
-    }, 2000, self.connectionParams);
+			outputLog("The scheduled reconnect from packetTimeout, PDU type, is happening now",0,self.connectionID);
+			self.connectNow.apply(self,arguments);
+		}, 2000, self.connectionParams);
 		return undefined;
 	}
 	if (packetType === "read") {
@@ -1258,7 +1261,7 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 
 
 NodeS7.prototype.onClientDisconnect = function(){
-  var self = this;
+  	var self = this;
 	outputLog('ISO-on-TCP connection DISCONNECTED.',0,self.connectionID);
 
 	// We issue the callback here for Trela/Honcho - in some cases TCP connects, and ISO-on-TCP doesn't.  
@@ -1268,8 +1271,12 @@ NodeS7.prototype.onClientDisconnect = function(){
 		self.connectCallback("Error - TCP connected, ISO didn't");
 	}
 
-	self.connectionCleanup();
-	self.tryingToConnectNow = false;
+	// We used to call self.connectionCleanup() - in other words we would give up.
+	// However - realize that this event is called when the OTHER END of the connection sends a FIN packet.  
+	// Certain situations (download user program to mem card on S7-400, pop memory card out of S7-300, both with NetLink) cause this to happen.
+	// So now, let's try a "connetionReset".  This way, we are guaranteed to return values (or bad) and reset at the proper time.
+	// self.connectionCleanup();
+	self.connectionReset();
 }
 
 NodeS7.prototype.connectionReset = function() {
