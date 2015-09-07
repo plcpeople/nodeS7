@@ -1529,10 +1529,11 @@ function writePostProcess(theItem) {
 function processS7ReadItem(theItem) {
 	
 	var thePointer = 0;
+	var strlen = 0;
 	
 	if (theItem.arrayLength > 1) {
 		// Array value.  
-		if (theItem.datatype != 'C' && theItem.datatype != 'CHAR') {
+		if (theItem.datatype != 'C' && theItem.datatype != 'CHAR' && theItem.datatype != 'S' && theItem.datatype != 'STRING') {
 			theItem.value = [];
 			theItem.quality = [];
 		} else {
@@ -1575,7 +1576,16 @@ function processS7ReadItem(theItem) {
 				case "BYTE":
 					theItem.value.push(theItem.byteBuffer.readUInt8(thePointer));
 					break;
-
+				case "S":
+				case "STRING":
+					if (arrayIndex === 1) {
+						strlen = theItem.byteBuffer.readUInt8(thePointer);
+					}					
+					if (arrayIndex > 1 && arrayIndex < (strlen + 2)) {  // say strlen = 1 (one-char string) this char is at arrayIndex of 2.
+						// Convert to string.  
+						theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer));
+					}
+					break;
 				case "C":
 				case "CHAR":
 					// Convert to string.  
@@ -1637,6 +1647,7 @@ function processS7ReadItem(theItem) {
 				// No support as of yet for signed 8 bit.  This isn't that common in Siemens.  
 				theItem.value = theItem.byteBuffer.readUInt8(thePointer);
 				break;
+			// No support for single strings.			
 			case "C":
 			case "CHAR":
 				// No support as of yet for signed 8 bit.  This isn't that common in Siemens.  
@@ -1729,6 +1740,19 @@ function bufferizeS7Item(theItem) {
 //??					theItem.writeBuffer.writeUInt8(theItem.writeValue.toCharCode(), thePointer);
 					theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(arrayIndex), thePointer);
 					break;
+				case "S":
+				case "STRING":
+					// Convert to string.  
+					if (arrayIndex === 0) {
+						theItem.writeBuffer.writeUInt8(theItem.arrayLength-2, thePointer); // Array length is requested val, -2 is string length
+					} else if (arrayIndex === 1) {												
+						theItem.writeBuffer.writeUInt8(Math.min(theItem.arrayLength-2,theItem.writeValue.length), thePointer); 
+					} else if (arrayIndex > 1 && arrayIndex < (theItem.writeValue.length + 2)) { 
+						theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(arrayIndex-2), thePointer);
+					} else {
+						theItem.writeBuffer.writeUInt8(32, thePointer); // write space
+					}
+					break;				
 				case "TIMER":
 				case "COUNTER":
 					// I didn't think we supported arrays of timers and counters.
@@ -1955,6 +1979,19 @@ function stringToS7Addr(addr, useraddr) {
 		theItem.offset = parseInt(splitString2[0].replace(/[A-z]/gi, ''), 10);
 	}
 
+	if (theItem.datatype === 'DI') {
+		theItem.datatype = 'DINT';
+	}
+	if (theItem.datatype === 'I') {
+		theItem.datatype = 'INT';
+	}
+	if (theItem.datatype === 'DW') {
+		theItem.datatype = 'DWORD';
+	}
+	if (theItem.datatype === 'R') {
+		theItem.datatype = 'REAL';
+	}
+
 	switch (theItem.datatype) {
 	case "REAL":
 	case "DWORD":
@@ -1972,6 +2009,11 @@ function stringToS7Addr(addr, useraddr) {
 	case "C":
 	case "BYTE":
 	case "CHAR":
+		theItem.dtypelen = 1;
+		break;
+	case "S":
+	case "STRING":
+		theItem.arrayLength += 2;
 		theItem.dtypelen = 1;
 		break;
 	default:
@@ -2125,6 +2167,8 @@ function S7Item() { // Object
 			return false;
 		case "C":
 		case "CHAR":
+		case "S":
+		case "STRING":
 			// Convert to string.  
 			return "";
 		default:
