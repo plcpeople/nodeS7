@@ -1543,8 +1543,13 @@ function processS7ReadItem(theItem) {
 		var bitShiftAmount = theItem.bitOffset;
 		for (arrayIndex = 0; arrayIndex < theItem.arrayLength; arrayIndex++) {
 			if (theItem.qualityBuffer[thePointer] !== 0xC0) {
-				theItem.value.push(theItem.badValue());
-				theItem.quality.push('BAD ' + theItem.qualityBuffer[thePointer]);
+				if (theItem.quality instanceof Array) {
+					theItem.value.push(theItem.badValue());
+					theItem.quality.push('BAD ' + theItem.qualityBuffer[thePointer]);
+				} else {
+					theItem.value = theItem.badValue();
+					theItem.quality = 'BAD ' + theItem.qualityBuffer[thePointer];
+				}
 			} else {
 				// If we're a string, quality is not an array.
 				if (theItem.quality instanceof Array) {
