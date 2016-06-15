@@ -2061,7 +2061,7 @@ function stringToS7Addr(addr, useraddr) {
 		return undefined;
 	}
 
-	if (theItem.datatype === 'X') {
+	if (theItem.datatype === 'X' && theItem.arrayLength === 1) {
 		theItem.writeTransportCode = 0x03;
 	} else {
 		theItem.writeTransportCode = theItem.readTransportCode;
