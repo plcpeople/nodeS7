@@ -671,7 +671,7 @@ NodeS7.prototype.prepareWritePacket = function() {
 			}
 			requestNumber++;
 			numItems++;
-			packetWriteLength += (requestList[i].byteLengthWithFill + 4);
+			packetWriteLength += (requestList[i].byteLengthWithFill + 12 + 4); // Don't forget each request has a 12 byte header as well.
 			//outputLog('I is ' + i + ' Addr Type is ' + requestList[i].addrtype + ' and type is ' + requestList[i].datatype + ' and DBNO is ' + requestList[i].dbNumber + ' and offset is ' + requestList[i].offset + ' bit ' + requestList[i].bitOffset + ' len ' + requestList[i].arrayLength);
 			//S7AddrToBuffer(requestList[i]).copy(self.writeReq, 19 + numItems * 12);  // i or numItems?  used to be i.  
 			//itemBuffer = bufferizeS7Packet(requestList[i]);
