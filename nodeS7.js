@@ -35,10 +35,15 @@ var net = require("net");
 var _ = require("underscore");
 var util = require("util");
 var effectiveDebugLevel = 0; // intentionally global, shared between connections
+var silentMode = false;
 
 module.exports = NodeS7;
 
-function NodeS7(){
+function NodeS7(opts){
+  opts = opts || {};
+  silentMode = opts.silent || false;
+  effectiveDebugLevel = opts.debug ? 99 : 0
+
   var self = this;
 
   self.connectReq = new Buffer([0x03,0x00,0x00,0x16,0x11,0xe0,0x00,0x00,0x00,0x02,0x00,0xc0,0x01,0x0a,0xc1,0x02,0x01,0x00,0xc2,0x02,0x01,0x02]);
@@ -2221,6 +2226,8 @@ function outputError(txt) {
 }
 
 function outputLog(txt, debugLevel, id) {
+	if(silentMode) return;
+
 	var idtext;
 	if (typeof(id) === 'undefined') {
 		idtext = '';
