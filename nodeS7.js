@@ -88,6 +88,7 @@ function NodeS7(opts){
   self.readPacketValid = false;
   self.writeInQueue = false;
   self.connectCBIssued = false;
+  self.dropConnectionCallback = null;
 }
 
 NodeS7.prototype.setTranslationCB = function(cb) {
@@ -120,11 +121,13 @@ NodeS7.prototype.initiateConnection = function (cParam, callback) {
 	self.connectNow(self.connectionParams, false);
 }
 
-NodeS7.prototype.dropConnection = function () {
+NodeS7.prototype.dropConnection = function (callback) {
   var self = this;
   if (typeof(self.isoclient) !== 'undefined') {
-	self.isoclient.end();
-    // now wait for 'on close' event to trigger connection cleanup
+      // store the callback and request and end to the connection
+      self.dropConnectionCallback = callback;
+      self.isoclient.end();
+      // now wait for 'on close' event to trigger connection cleanup
   }	
 }
 
@@ -1294,6 +1297,11 @@ NodeS7.prototype.onClientClose = function(){
 	var self = this;
     // clean up the connection now the socket has closed
 	self.connectionCleanup();
+
+    // initiate the callback stored by dropConnection
+    if( self.dropConnectionCallback ) {
+        self.dropConnectionCallback();
+    }
 }
 
 NodeS7.prototype.connectionReset = function() {

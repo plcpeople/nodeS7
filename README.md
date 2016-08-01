@@ -95,10 +95,10 @@ params should be an object with the following keys:
 `callback(err)` will be executed on success or failure.  err is either an error object, or undefined on successful connection.
 
 
-#### <a name="drop-connection"></a>nodes7.dropConnection()
+#### <a name="drop-connection"></a>nodes7.dropConnection(callback)
 Disconnects from a PLC.  
 
-This simply terminates the TCP connection.
+This simply terminates the TCP connection. The callback is called upon completion of the close.
 
 
 #### <a name="set-translation-cb"></a>nodes7.setTranslationCB(translator)
