@@ -128,7 +128,10 @@ NodeS7.prototype.dropConnection = function (callback) {
       self.dropConnectionCallback = callback;
       self.isoclient.end();
       // now wait for 'on close' event to trigger connection cleanup
-  }	
+  }	else {
+      // if client not active, then callback immediately
+      callback();
+  }
 }
 
 NodeS7.prototype.connectNow = function (cParam, suppressCallback) {
