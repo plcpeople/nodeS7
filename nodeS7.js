@@ -124,8 +124,8 @@ NodeS7.prototype.dropConnection = function () {
   var self = this;
   if (typeof(self.isoclient) !== 'undefined') {
 	self.isoclient.end();
+    // now wait for 'on close' event to trigger connection cleanup
   }	
-  self.connectionCleanup();
 }
 
 NodeS7.prototype.connectNow = function (cParam, suppressCallback) {
@@ -230,6 +230,12 @@ NodeS7.prototype.onTCPConnect = function() {
 	// Hook up the event that fires on disconnect
 	self.isoclient.on('end', function(){
 		self.onClientDisconnect.apply(self, arguments);
+	});
+
+    // listen for close (caused by us sending an end)
+	self.isoclient.on('close', function(){
+		self.onClientClose.apply(self, arguments);
+
 	});
 }
 
@@ -1284,6 +1290,12 @@ NodeS7.prototype.onClientDisconnect = function(){
 	self.connectionReset();
 }
 
+NodeS7.prototype.onClientClose = function(){
+	var self = this;
+    // clean up the connection now the socket has closed
+	self.connectionCleanup();
+}
+
 NodeS7.prototype.connectionReset = function() {
 	var self = this;
 	self.isoConnectionState = 0;
@@ -1321,6 +1333,7 @@ NodeS7.prototype.connectionCleanup = function(){
 		self.isoclient.removeAllListeners('error');
 		self.isoclient.removeAllListeners('connect');
 		self.isoclient.removeAllListeners('end');
+        self.isoclient.removeAllListeners('close');
 	}
 	clearTimeout(self.connectTimeout);
 	clearTimeout(self.PDUTimeout);
