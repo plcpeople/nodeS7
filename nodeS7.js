@@ -439,7 +439,7 @@ NodeS7.prototype.removeItemsNow = function(arg) {
 	} else if (typeof arg === "string") {
 		for (i = 0; i < self.polledReadBlockList.length; i++) {
 			outputLog('TCBA ' + self.translationCB(arg));
-			if (self.polledReadBlockList[i].addr === translationCB(arg)) {
+			if (self.polledReadBlockList[i].addr === self.translationCB(arg)) {
 				outputLog('Splicing');
 				self.polledReadBlockList.splice(i, 1);
 			}
