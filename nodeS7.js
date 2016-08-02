@@ -89,6 +89,7 @@ function NodeS7(opts){
   self.writeInQueue = false;
   self.connectCBIssued = false;
   self.dropConnectionCallback = null;
+  self.dropConnectionTimer = null;
 }
 
 NodeS7.prototype.setTranslationCB = function(cb) {
@@ -124,10 +125,24 @@ NodeS7.prototype.initiateConnection = function (cParam, callback) {
 NodeS7.prototype.dropConnection = function (callback) {
   var self = this;
   if (typeof(self.isoclient) !== 'undefined') {
-      // store the callback and request and end to the connection
+     // store the callback and request and end to the connection
       self.dropConnectionCallback = callback;
       self.isoclient.end();
       // now wait for 'on close' event to trigger connection cleanup
+
+      // but also start a timer to destroy the connection in case we do not receive the close
+      self.dropConnectionTimer = setTimeout(function(){
+          if( self.dropConnectionCallback ) {
+              // destroy the socket connection
+              self.isoclient.destroy();
+              // clean up the connection now the socket has closed
+              self.connectionCleanup();
+              // initate the callback
+              self.dropConnectionCallback();
+              // prevent any possiblity of the callback being called twice
+              self.dropConnectionCallback = null;
+          }
+      }, 2500);
   }	else {
       // if client not active, then callback immediately
       callback();
@@ -1304,6 +1319,10 @@ NodeS7.prototype.onClientClose = function(){
     // initiate the callback stored by dropConnection
     if( self.dropConnectionCallback ) {
         self.dropConnectionCallback();
+        // prevent any possiblity of the callback being called twice
+        self.dropConnectionCallback = null;
+        // and cancel the timeout
+        clearTimeout(self.dropConnectionTimer);
     }
 }
 
