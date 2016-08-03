@@ -133,6 +133,8 @@ Removes `items` to the internal read polling list.
 
 `items` can be a string or an array of strings.
 
+If `items` is not defined then all items are removed.
+
 #### <a name="write-items"></a>nodes7.writeItems(items, values)
 Writes `items` to the PLC using the corresponding `values`.  
 

@@ -1,3 +1,8 @@
+Version: 0.1.8
+------------
+- Fix missing self in dropConnection
+- Add callback to dropConnection
+
 Version: 0.1.7
 ------------
 - Add optional options to NodeS7 constructor

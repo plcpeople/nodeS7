@@ -1,9 +1,8 @@
 .npmignore~
 nodeS7.js~
 package.json~
-test2.js
-test2.js~
+test*.js
+test*.js~
 npm-debug.log
-
 
 
