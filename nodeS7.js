@@ -583,6 +583,9 @@ NodeS7.prototype.prepareWritePacket = function() {
 		return undefined;
 	}
 
+	// Reinitialize the WriteBlockList
+	self.globalWriteBlockList = [];
+
 	// At this time we do not do write optimizations.
 	// The reason for this is it is would cause numerous issues depending how the code was written in the PLC.
 	// If we write M0.1 and M0.2 then to optimize we would have to write MB0, which also writes 0.0, 0.3, 0.4...
