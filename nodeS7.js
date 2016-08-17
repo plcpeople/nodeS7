@@ -32,7 +32,6 @@
 
 
 var net = require("net");
-var _ = require("underscore");
 var util = require("util");
 var effectiveDebugLevel = 0; // intentionally global, shared between connections
 var silentMode = false;
@@ -382,7 +381,7 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 		if (typeof (self.instantWriteBlockList[self.instantWriteBlockList.length - 1]) !== "undefined") {
 			self.instantWriteBlockList[self.instantWriteBlockList.length - 1].writeValue = value;
 		}
-	} else if (_.isArray(arg) && _.isArray(value) && (arg.length == value.length)) {
+	} else if (Array.isArray(arg) && Array.isArray(value) && (arg.length == value.length)) {
 		for (i = 0; i < arg.length; i++) {
 			if (typeof arg[i] === "string") {
 				self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
@@ -429,7 +428,7 @@ NodeS7.prototype.addItemsNow = function(arg) {
 	outputLog("Adding " + arg, 0, self.connectionID);
 	if (typeof (arg) === "string" && arg !== "_COMMERR") {
 		self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
-	} else if (_.isArray(arg)) {
+	} else if (Array.isArray(arg)) {
 		for (i = 0; i < arg.length; i++) {
 			if (typeof (arg[i]) === "string" && arg[i] !== "_COMMERR") {
 				self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
@@ -465,7 +464,7 @@ NodeS7.prototype.removeItemsNow = function(arg) {
 				self.polledReadBlockList.splice(i, 1);
 			}
 		}
-	} else if (_.isArray(arg)) {
+	} else if (Array.isArray(arg)) {
 		for (i = 0; i < self.polledReadBlockList.length; i++) {
 			for (var j = 0; j < arg.length; j++) {
 				if (self.polledReadBlockList[i].addr === self.translationCB(arg[j])) {
@@ -2240,7 +2239,7 @@ function doNothing(arg) {
 function isQualityOK(obj) {
 	if (typeof obj === "string") {
 		if (obj !== 'OK') { return false; }
-	} else if (_.isArray(obj)) {
+	} else if (Array.isArray(obj)) {
 		for (var i = 0; i < obj.length; i++) {
 			if (typeof obj[i] !== "string" || obj[i] !== 'OK') { return false; }
 		}

@@ -1,3 +1,9 @@
+Version: 0.1.9
+------------
+- Fix missing self.globalWriteBlockList reinitialize
+- remove dependencies
+- Linting
+
 Version: 0.1.8
 ------------
 - Fix missing self in dropConnection
