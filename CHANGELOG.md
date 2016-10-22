@@ -1,3 +1,8 @@
+Version: 0.1.10
+------------
+- Fix errors writing single/multiple items of bit and byte length
+- Fix errors writing arrays of boolean with length greater than 8 and at least one true value
+
 Version: 0.1.9
 ------------
 - Fix missing self.globalWriteBlockList reinitialize

@@ -964,6 +964,13 @@ NodeS7.prototype.sendWritePacket = function() {
 			itemBuffer = getWriteBuffer(self.writePacketArray[i].itemList[j]);
 			itemBuffer.copy(dataBuffer, dataBufferPointer);
 			dataBufferPointer += itemBuffer.length;
+			// NOTE: It seems that when writing, the data that is sent must have a "fill byte" so that data length is even only for all
+			//  but the last request.  The last request must have no padding.  So we add the padding here.
+			if (j < (self.writePacketArray[i].itemList.length - 1)) {
+				if (itemBuffer.length % 2) {
+					dataBufferPointer += 1;
+				}
+			}
 		}
 
 		//		outputLog('DataBufferPointer is ' + dataBufferPointer);
@@ -1712,13 +1719,16 @@ function processS7ReadItem(theItem) {
 function getWriteBuffer(theItem) {
 	var newBuffer;
 
+	// NOTE: It seems that when writing, the data that is sent must have a "fill byte" so that data length is even only for all
+	//  but the last request.  The last request must have no padding.  So we DO NOT add the padding here anymore.
+
 	if (theItem.datatype === 'X' && theItem.arrayLength === 1) {
-		newBuffer = new Buffer(2 + 4);
+		newBuffer = new Buffer(2 + 3); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
 		// Initialize, especially be sure to get last bit which may be a fill bit.
 		newBuffer.fill(0);
 		newBuffer.writeUInt16BE(1, 2); // Might need to do something different for different trans codes
 	} else {
-		newBuffer = new Buffer(theItem.byteLengthWithFill + 4);
+		newBuffer = new Buffer(theItem.byteLength + 4); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
 		newBuffer.fill(0);
 		newBuffer.writeUInt16BE(theItem.byteLength * 8, 2); // Might need to do something different for different trans codes
 	}
@@ -1802,10 +1812,11 @@ function bufferizeS7Item(theItem) {
 				// For bit arrays, we have to do some tricky math to get the pointer to equal the byte offset.
 				// Note that we add the bit offset here for the rare case of an array starting at other than zero.  We either have to
 				// drop support for this at the request level or support it here.
-
 				if ((((arrayIndex + theItem.bitOffset + 1) % 8) === 0) || (arrayIndex == theItem.arrayLength - 1)) {
 					thePointer += theItem.dtypelen;
 					bitShiftAmount = 0;
+					// Zero this now.  Otherwise it will have the same value next byte if non-zero.
+					theByte = 0;
 				}
 			} else {
 				// Add to the pointer every time.
