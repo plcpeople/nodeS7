@@ -1,3 +1,7 @@
+Version: 0.1.11
+------------
+- Fix error when reading from multiple DBs
+
 Version: 0.1.10
 ------------
 - Fix errors writing single/multiple items of bit and byte length
