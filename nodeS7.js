@@ -757,6 +757,9 @@ NodeS7.prototype.prepareReadPacket = function() {
 			(!self.isOptimizableArea(itemList[i].areaS7Code)) || 					// Can't optimize T,C (I don't think) and definitely not P.
 			((itemList[i].offset - self.globalReadBlockList[thisBlock].offset + itemList[i].byteLength) > maxByteRequest) ||      	// If this request puts us over our max byte length, create a new block for consistency reasons.
 			(itemList[i].offset - (self.globalReadBlockList[thisBlock].offset + self.globalReadBlockList[thisBlock].byteLength) > self.maxGap)) {		// If our gap is large, create a new block.
+			
+			outputLog("Skipping optimization of item " + itemList[i].addr, 0, self.connectionID);
+			
 			// At this point we give up and create a new block.
 			thisBlock = thisBlock + 1;
 			self.globalReadBlockList[thisBlock] = itemList[i]; // By reference.
@@ -2229,6 +2232,12 @@ function itemListSorter(a, b) {
 	// Feel free to manipulate these next two lines...
 	if (a.areaS7Code < b.areaS7Code) { return -1; }
 	if (a.areaS7Code > b.areaS7Code) { return 1; }
+
+	// Group first the items of the same DB
+	if (a.addrtype === 'DB') {
+		if (a.dbNumber < b.dbNumber) { return -1; }
+		if (a.dbNumber > b.dbNumber) { return 1; }
+	}
 
 	// But for byte offset we need to start at 0.
 	if (a.offset < b.offset) { return -1; }
