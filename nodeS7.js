@@ -757,9 +757,9 @@ NodeS7.prototype.prepareReadPacket = function() {
 			(!self.isOptimizableArea(itemList[i].areaS7Code)) || 					// Can't optimize T,C (I don't think) and definitely not P.
 			((itemList[i].offset - self.globalReadBlockList[thisBlock].offset + itemList[i].byteLength) > maxByteRequest) ||      	// If this request puts us over our max byte length, create a new block for consistency reasons.
 			(itemList[i].offset - (self.globalReadBlockList[thisBlock].offset + self.globalReadBlockList[thisBlock].byteLength) > self.maxGap)) {		// If our gap is large, create a new block.
-			
+
 			outputLog("Skipping optimization of item " + itemList[i].addr, 0, self.connectionID);
-			
+
 			// At this point we give up and create a new block.
 			thisBlock = thisBlock + 1;
 			self.globalReadBlockList[thisBlock] = itemList[i]; // By reference.
@@ -1922,75 +1922,175 @@ function stringToS7Addr(addr, useraddr) {
 		splitString2 = addr.split('.');
 
 		switch (splitString2[0].replace(/[0-9]/gi, '')) {
-			case "PAW":
-			case "PIW":
-			case "PEW":
-			case "PQW":
-				theItem.addrtype = "P";
-				theItem.datatype = "INT";
-				break;
-			case "PAD":
-			case "PID":
-			case "PED":
-			case "PQD":
-				theItem.addrtype = "P";
-				theItem.datatype = "DINT";
-				break;
-			case "PAB":
+			/* We do have the memory areas:
+			  "input", "peripheral input", "output", "peripheral output", ",marker", "counter" and "timer" as I, PI, Q, PQ, M, C and T.
+			   Datablocks are handles somewere else.
+			   We do have the data types:
+			   "bit", "byte", "char", "word", "int16", "dword", "int32", "real" as X, B, C, W, I, DW, DI and R
+			   What about "uint16", "uint32"
+			*/
+
+/* All styles of peripheral IOs (no bit access allowed) */
 			case "PIB":
 			case "PEB":
 			case "PQB":
+			case "PAB":
 				theItem.addrtype = "P";
 				theItem.datatype = "BYTE";
 				break;
-			case "IB":
-			case "IC":
-			case "EB":
-			case "EC":
-				theItem.addrtype = "I";
-				theItem.datatype = "BYTE";
+			case "PIC":
+			case "PEC":
+			case "PQC":
+			case "PAC":
+				theItem.addrtype = "P";
+				theItem.datatype = "CHAR";
 				break;
-			case "IW":
-			case "EW":
-			case "II":
-			case "EI":
-				theItem.addrtype = "I";
+			case "PIW":
+			case "PEW":
+			case "PQW":
+			case "PAW":
+				theItem.addrtype = "P";
+				theItem.datatype = "WORD";
+				break;
+			case "PII":
+			case "PEI":
+			case "PQI":
+			case "PAI":
+				theItem.addrtype = "P";
 				theItem.datatype = "INT";
 				break;
-			case "QW":
-			case "AW":
-			case "QI":
-			case "AI":
-				theItem.addrtype = "Q";
-				theItem.datatype = "INT";
+			case "PID":
+			case "PED":
+			case "PQD":
+			case "PAD":
+				theItem.addrtype = "P";
+				theItem.datatype = "DWORD";
 				break;
-			case "MB":
-			case "MC":
-				theItem.addrtype = "M";
-				theItem.datatype = "BYTE";
+			case "PIDI":
+			case "PEDI":
+			case "PQDI":
+			case "PADI":
+				theItem.addrtype = "P";
+				theItem.datatype = "DINT";
 				break;
-			case "M":
-				theItem.addrtype = "M";
-				theItem.datatype = "X";
+			case "PIR":
+			case "PER":
+			case "PQR":
+			case "PAR":
+				theItem.addrtype = "P";
+				theItem.datatype = "REAL";
 				break;
+
+/* All styles of standard inputs (in oposit to peripheral inputs) */
 			case "I":
 			case "E":
 				theItem.addrtype = "I";
 				theItem.datatype = "X";
 				break;
+			case "IB":
+			case "EB":
+				theItem.addrtype = "I";
+				theItem.datatype = "BYTE";
+				break;
+			case "IC":
+			case "EC":
+				theItem.addrtype = "I";
+				theItem.datatype = "CHAR";
+				break;
+			case "IW":
+			case "EW":
+				theItem.addrtype = "I";
+				theItem.datatype = "WORD";
+				break;
+			case "II":
+			case "EI":
+				theItem.addrtype = "I";
+				theItem.datatype = "INT";
+				break;
+			case "ID":
+			case "ED":
+				theItem.addrtype = "I";
+				theItem.datatype = "DWORD";
+				break;
+			case "IDI":
+			case "EDI":
+				theItem.addrtype = "I";
+				theItem.datatype = "DINT";
+				break;
+			case "IR":
+			case "ER":
+				theItem.addrtype = "I";
+				theItem.datatype = "REAL";
+				break;
+
+/* All styles of standard outputs (in oposit to peripheral outputs) */
 			case "Q":
 			case "A":
 				theItem.addrtype = "Q";
 				theItem.datatype = "X";
 				break;
+			case "QB":
+			case "AB":
+				theItem.addrtype = "Q";
+				theItem.datatype = "BYTE";
+				break;
+			case "QC":
+			case "AC":
+				theItem.addrtype = "Q";
+				theItem.datatype = "CHAR";
+				break;
+			case "QW":
+			case "AW":
+				theItem.addrtype = "Q";
+				theItem.datatype = "WORD";
+				break;
+			case "QI":
+			case "AI":
+				theItem.addrtype = "Q";
+				theItem.datatype = "INT";
+				break;
+			case "QD":
+			case "AD":
+				theItem.addrtype = "Q";
+				theItem.datatype = "DWORD";
+				break;
+			case "QDI":
+			case "ADI":
+				theItem.addrtype = "Q";
+				theItem.datatype = "DINT";
+				break;
+			case "QR":
+			case "AR":
+				theItem.addrtype = "Q";
+				theItem.datatype = "REAL";
+				break;
+
+/* All styles of marker */
+			case "M":
+				theItem.addrtype = "M";
+				theItem.datatype = "X";
+				break;
+			case "MB":
+				theItem.addrtype = "M";
+				theItem.datatype = "BYTE";
+				break;
+			case "MC":
+				theItem.addrtype = "M";
+				theItem.datatype = "CHAR";
+				break;
 			case "MW":
+				theItem.addrtype = "M";
+				theItem.datatype = "WORD";
+				break;
 			case "MI":
 				theItem.addrtype = "M";
 				theItem.datatype = "INT";
 				break;
-			case "MDW":
-			case "MDI":
 			case "MD":
+				theItem.addrtype = "M";
+				theItem.datatype = "DWORD";
+				break;
+			case "MDI":
 				theItem.addrtype = "M";
 				theItem.datatype = "DINT";
 				break;
@@ -1998,14 +2098,19 @@ function stringToS7Addr(addr, useraddr) {
 				theItem.addrtype = "M";
 				theItem.datatype = "REAL";
 				break;
+
+/* Timer */
 			case "T":
 				theItem.addrtype = "T";
 				theItem.datatype = "TIMER";
 				break;
+
+/* Counter */
 			case "C":
 				theItem.addrtype = "C";
 				theItem.datatype = "COUNTER";
 				break;
+
 			default:
 				outputLog('Failed to find a match for ' + splitString2[0]);
 				return undefined;
