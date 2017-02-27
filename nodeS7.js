@@ -298,65 +298,73 @@ NodeS7.prototype.onISOConnectReply = function(data) {
 	});
 }
 
-NodeS7.prototype.onPDUReply = function(data) {
+NodeS7.prototype.onPDUReply = function(theData) {
 	var self = this;
 	self.isoclient.removeAllListeners('data');
 	self.isoclient.removeAllListeners('error');
 
 	clearTimeout(self.PDUTimeout);
 
-	// Expected length is from packet sniffing - some applications may be different
-	if (data.readInt16BE(2) !== data.length || data.length < 27 || data[5] !== 0xf0 || data[4] + 1 + 12 + data.readInt16BE(13) !== (data.length - 4) || !(data[6] >> 7)) {
+	var data=checkRFCData(theData);
+
+	if(data==="fastACK"){
+		//Read again and wait for the requested data
+		outputLog('Fast Acknowledge received.', 0, self.connectionID);
+		self.isoclient.removeAllListeners('error');
+		self.isoclient.removeAllListeners('data');
+		self.isoclient.on('data', function() {
+			self.onPDUReply.apply(self, arguments);
+		});
+		self.isoclient.on('error', function() {
+			self.readWriteError.apply(self, arguments);
+		});
+	}else if((data[4] + 1 + 12 + data.readInt16BE(13) === data.readInt16BE(2) - 4)){//valid the length of FA+S7 package :  ISO_Length+ISO_LengthItself+S7Com_Header+S7Com_Header_ParameterLength===TPKT_Length-4
+		//Everything OK...go on
+		// Track the connection state
+		self.isoConnectionState = 4;  // 4 = Received PDU response, good to go
+
+		var partnerMaxParallel1 = data.readInt16BE(21);
+		var partnerMaxParallel2 = data.readInt16BE(23);
+		var partnerPDU = data.readInt16BE(25);
+
+		self.maxParallel = self.requestMaxParallel;
+
+		if (partnerMaxParallel1 < self.requestMaxParallel) {
+			self.maxParallel = partnerMaxParallel1;
+		}
+		if (partnerMaxParallel2 < self.requestMaxParallel) {
+			self.maxParallel = partnerMaxParallel2;
+		}
+		if (partnerPDU < self.requestMaxPDU) {
+			self.maxPDU = partnerPDU;
+		} else {
+			self.maxPDU = self.requestMaxPDU;
+		}
+
+		outputLog('Received PDU Response - Proceeding with PDU ' + self.maxPDU + ' and ' + self.maxParallel + ' max parallel connections.', 0, self.connectionID);
+		self.isoclient.on('data', function() {
+			self.onResponse.apply(self, arguments);
+		});  // We need to make sure we don't add this event every time if we call it on data.
+		self.isoclient.on('error', function() {
+			self.readWriteError.apply(self, arguments);
+		});  // Might want to remove the self.connecterror listener
+		//self.isoclient.removeAllListeners('error');
+		if ((!self.connectCBIssued) && (typeof (self.connectCallback) === "function")) {
+			self.connectCBIssued = true;
+			self.connectCallback();
+		}
+	}else{
+		outputLog('INVALID Telegram ', 0, self.connectionID);
+		outputLog('Byte 0 From Header is ' + theData[0] + ' it has to be 0x03, Byte 5 From Header is  ' + theData[5] + ' and it has to be 0x0F ', 0, self.connectionID);
 		outputLog('INVALID PDU RESPONSE or CONNECTION REFUSED - DISCONNECTING', 0, self.connectionID);
-		outputLog('TPKT Length From Header is ' + data.readInt16BE(2) + ' and RCV buffer length is ' + data.length + ' and COTP length is ' + data.readUInt8(4) + ' and data[6] is ' + data[6], 0, self.connectionID);
-		outputLog(data);
+		outputLog('TPKT Length From Header is ' + theData.readInt16BE(2) + ' and RCV buffer length is ' + theData.length + ' and COTP length is ' + theData.readUInt8(4) + ' and data[6] is ' + theData[6], 0, self.connectionID);
+		outputLog(theData);
 		self.isoclient.end();
 		setTimeout(function() {
 			self.connectNow.apply(self, arguments);
 		}, 2000, self.connectionParams);
 		return null;
 	}
-
-	// Track the connection state
-	self.isoConnectionState = 4;  // 4 = Received PDU response, good to go
-
-	var partnerMaxParallel1 = data.readInt16BE(21);
-	var partnerMaxParallel2 = data.readInt16BE(23);
-	var partnerPDU = data.readInt16BE(25);
-
-	self.maxParallel = self.requestMaxParallel;
-
-	if (partnerMaxParallel1 < self.requestMaxParallel) {
-		self.maxParallel = partnerMaxParallel1;
-	}
-
-	if (partnerMaxParallel2 < self.requestMaxParallel) {
-		self.maxParallel = partnerMaxParallel2;
-	}
-
-	if (partnerPDU < self.requestMaxPDU) {
-		self.maxPDU = partnerPDU;
-	} else {
-		self.maxPDU = self.requestMaxPDU;
-	}
-
-	outputLog('Received PDU Response - Proceeding with PDU ' + self.maxPDU + ' and ' + self.maxParallel + ' max parallel connections.', 0, self.connectionID);
-
-	self.isoclient.on('data', function() {
-		self.onResponse.apply(self, arguments);
-	});  // We need to make sure we don't add this event every time if we call it on data.
-
-	self.isoclient.on('error', function() {
-		self.readWriteError.apply(self, arguments);
-	});  // Might want to remove the self.connecterror listener
-
-	//self.isoclient.removeAllListeners('error');
-
-	if ((!self.connectCBIssued) && (typeof (self.connectCallback) === "function")) {
-		self.connectCBIssued = true;
-		self.connectCallback();
-	}
-
 }
 
 
@@ -1042,7 +1050,7 @@ NodeS7.prototype.isOptimizableArea = function(area) {
 	}
 }
 
-NodeS7.prototype.onResponse = function(data) {
+NodeS7.prototype.onResponse = function(theData) {
 	var self = this;
 	// Packet Validity Check.  Note that this will pass even with a "not available" response received from the server.
 	// For length calculation and verification:
@@ -1056,74 +1064,100 @@ NodeS7.prototype.onResponse = function(data) {
 
 	// NOT SO FAST - can't do this here.  If we time out, then later get the reply, we can't decrement this twice.  Or the CPU will not like us.  Do it if not rcvd.  self.parallelJobsNow--;
 
-	if (data.length > 8 && data[8] != 3) {
-		outputLog('PDU type (byte 8) was returned as ' + data[8] + ' where the response PDU of 3 was expected.');
-		outputLog('Maybe you are requesting more than 240 bytes of data in a packet?');
-		outputLog(data);
-		self.connectionReset();
-		return null;
-	}
+	var data=checkRFCData(theData);
 
-	// The smallest read packet will pass a length check of 25.  For a 1-item write response with no data, length will be 22.
-	if (data.length > data.readInt16BE(2)) {
-		outputLog("An oversize packet was detected.  Excess length is " + data.length - data.readInt16BE(2) + ".  ");
-		outputLog("We assume this is because two packets were sent at nearly the same time by the PLC.");
-		outputLog("We are slicing the buffer and scheduling the second half for further processing next loop.");
-		setTimeout(function() {
+	if(data==="fastACK"){
+		//read again and wait for the requested data
+		outputLog('Fast Acknowledge received.', 0, self.connectionID);
+		self.isoclient.removeAllListeners('error');
+		self.isoclient.removeAllListeners('data');
+		self.isoclient.on('data', function() {
 			self.onResponse.apply(self, arguments);
-		}, 0, data.slice(data.readInt16BE(2)));  // This re-triggers this same function with the sliced-up buffer.
-		// was used as a test		setTimeout(process.exit, 2000);
-	}
-
-	if (data.length < data.readInt16BE(2) || data.readInt16BE(2) < 22 || data[5] !== 0xf0 || data[4] + 1 + 12 + 4 + data.readInt16BE(13) + data.readInt16BE(15) !== data.readInt16BE(2) || !(data[6] >> 7) || (data[7] !== 0x32) || (data[8] !== 3)) {
-		outputLog('INVALID READ RESPONSE - DISCONNECTING');
-		outputLog('TPKT Length From Header is ' + data.readInt16BE(2) + ' and RCV buffer length is ' + data.length + ' and COTP length is ' + data.readUInt8(4) + ' and data[6] is ' + data[6]);
-		outputLog(data);
-		self.connectionReset();
-		return null;
-	}
-
-	// Log the receive
-	outputLog('Received ' + data.readUInt16BE(15) + ' bytes of S7-data from PLC.  Sequence number is ' + data.readUInt16BE(11), 1, self.connectionID);
-
-	// Check the sequence number
-	var foundSeqNum; // self.readPacketArray.length - 1;
-	var isReadResponse, isWriteResponse;
-
-	//	for (packetCount = 0; packetCount < self.readPacketArray.length; packetCount++) {
-	//		if (self.readPacketArray[packetCount].seqNum == data.readUInt16BE(11)) {
-	//			foundSeqNum = packetCount;
-	//			break;
-	//		}
-	//	}
-	foundSeqNum = self.findReadIndexOfSeqNum(data.readUInt16BE(11));
-
-	//	if (self.readPacketArray[packetCount] == undefined) {
-	if (foundSeqNum === undefined) {
-		foundSeqNum = self.findWriteIndexOfSeqNum(data.readUInt16BE(11));
-		if (foundSeqNum !== undefined) {
-			//		for (packetCount = 0; packetCount < self.writePacketArray.length; packetCount++) {
-			//			if (self.writePacketArray[packetCount].seqNum == data.readUInt16BE(11)) {
-			//				foundSeqNum = packetCount;
-			self.writeResponse(data, foundSeqNum);
-			isWriteResponse = true;
-			//				break;
+		});
+		self.isoclient.on('error', function() {
+			self.readWriteError.apply(self, arguments);
+		});		
+	}else if( data[7] === 0x32 ){//check the validy of FA+S7 package
+	
+		//*********************   VALIDY CHECK ***********************************
+		//TODO: Check S7-Header properly
+		if (data.length > 8 && data[8] != 3) {
+			outputLog('PDU type (byte 8) was returned as ' + data[8] + ' where the response PDU of 3 was expected.');
+			outputLog('Maybe you are requesting more than 240 bytes of data in a packet?');
+			outputLog(data);
+			self.connectionReset();
+			return null;
+		}
+		// The smallest read packet will pass a length check of 25.  For a 1-item write response with no data, length will be 22.
+		if (data.length > data.readInt16BE(2)) {
+			outputLog("An oversize packet was detected.  Excess length is " + data.length - data.readInt16BE(2) + ".  ");
+			outputLog("We assume this is because two packets were sent at nearly the same time by the PLC.");
+			outputLog("We are slicing the buffer and scheduling the second half for further processing next loop.");
+			setTimeout(function() {
+				self.onResponse.apply(self, arguments);
+			}, 0, data.slice(data.readInt16BE(2)));  // This re-triggers this same function with the sliced-up buffer.
+			// was used as a test		setTimeout(process.exit, 2000);
 		}
 
+		if (data.length < data.readInt16BE(2) || data.readInt16BE(2) < 22 || data[5] !== 0xf0 || data[4] + 1 + 12 + 4 + data.readInt16BE(13) + data.readInt16BE(15) !== data.readInt16BE(2) || !(data[6] >> 7) || (data[7] !== 0x32) || (data[8] !== 3)) {
+			outputLog('INVALID READ RESPONSE - DISCONNECTING');
+			outputLog('TPKT Length From Header is ' + data.readInt16BE(2) + ' and RCV buffer length is ' + data.length + ' and COTP length is ' + data.readUInt8(4) + ' and data[6] is ' + data[6]);
+			outputLog(data);
+			self.connectionReset();
+			return null;
+		}
 
-	} else {
-		isReadResponse = true;
-		self.readResponse(data, foundSeqNum);
-	}
+		//**********************   GO ON  *************************
+		// Log the receive
+		outputLog('Received ' + data.readUInt16BE(15) + ' bytes of S7-data from PLC.  Sequence number is ' + data.readUInt16BE(11), 1, self.connectionID);
 
-	if ((!isReadResponse) && (!isWriteResponse)) {
-		outputLog("Sequence number that arrived wasn't a write reply either - dropping");
-		outputLog(data);
-		// 	I guess this isn't a showstopper, just ignore it.
-		//		self.isoclient.end();
-		//		setTimeout(self.connectNow, 2000, self.connectionParams);
+		// Check the sequence number
+		var foundSeqNum; // self.readPacketArray.length - 1;
+		var isReadResponse, isWriteResponse;
+
+		//	for (packetCount = 0; packetCount < self.readPacketArray.length; packetCount++) {
+		//		if (self.readPacketArray[packetCount].seqNum == data.readUInt16BE(11)) {
+		//			foundSeqNum = packetCount;
+		//			break;
+		//		}
+		//	}
+		foundSeqNum = self.findReadIndexOfSeqNum(data.readUInt16BE(11));
+
+		//	if (self.readPacketArray[packetCount] == undefined) {
+		if (foundSeqNum === undefined) {
+			foundSeqNum = self.findWriteIndexOfSeqNum(data.readUInt16BE(11));
+			if (foundSeqNum !== undefined) {
+				//		for (packetCount = 0; packetCount < self.writePacketArray.length; packetCount++) {
+				//			if (self.writePacketArray[packetCount].seqNum == data.readUInt16BE(11)) {
+				//				foundSeqNum = packetCount;
+				self.writeResponse(data, foundSeqNum);
+				isWriteResponse = true;
+				//				break;
+			}
+
+
+		} else {
+			isReadResponse = true;
+			self.readResponse(data, foundSeqNum);
+		}
+
+		if ((!isReadResponse) && (!isWriteResponse)) {
+			outputLog("Sequence number that arrived wasn't a write reply either - dropping");
+			outputLog(data);
+			// 	I guess this isn't a showstopper, just ignore it.
+			//		self.isoclient.end();
+			//		setTimeout(self.connectNow, 2000, self.connectionParams);
+			return null;
+		}
+			
+	}else{
+		outputLog('INVALID READ RESPONSE - DISCONNECTING');
+		outputLog('TPKT Length From Header is ' + theData.readInt16BE(2) + ' and RCV buffer length is ' + theData.length + ' and COTP length is ' + theData.readUInt8(4) + ' and data[6] is ' + theData[6]);
+		outputLog(theData);
+		self.connectionReset();
 		return null;
 	}
+
 }
 
 NodeS7.prototype.findReadIndexOfSeqNum = function(seqNum) {
@@ -1370,6 +1404,35 @@ NodeS7.prototype.connectionCleanup = function() {
 /**
  * Internal Functions
  */
+
+function checkRFCData(data){
+   var ret=null;
+   var RFC_Version = data[0];
+   var TPKT_Length = data.readInt16BE(2);
+   var TPDU_Code = data[5]; //Data==0xF0 !!
+   var LastDataUnit = data[6];//empty fragmented frame => 0=not the last package; 1=last package
+  
+   if(RFC_Version !==0x03 && TPDU_Code !== 0xf0){
+      //Check if its an RFC package and a Data package
+      return 'error';
+   }else if((LastDataUnit >> 7) === 0 && TPKT_Length == data.length &&  data.length === 7){
+      // Check if its a Fast Acknowledge package from older PLCs or  WinAC or data is too long ... 
+      // For example: <Buffer 03 00 00 07 02 f0 00> => data.length==7
+      ret='fastACK'; 
+   }else if((LastDataUnit >> 7) == 1 && TPKT_Length === data.length){
+      // Check if its an  FastAcknowledge package + S7Data package
+      // <Buffer 03 00 00 1b 02 f0 80 32 03 00 00 00 00 00 08 00 00 00 00 f0 00 00 01 00 01 00 f0> => data.length==7+20=27
+      ret=data;
+   }else if((LastDataUnit >> 7) == 0  && TPKT_Length !== data.length){
+      // Check if its an  FastAcknowledge package + FastAcknowledge package+ S7Data package
+      // Possibly because NodeS7 or Application is too slow at this moment!
+      // <Buffer 03 00 00 07 02 f0 00 03 00 00 1b 02 f0 80 32 03 00 00 00 00 00 08 00 00 00 00 f0 00 00 01 00 01 00 f0>  => data.length==7+7+20=34
+      ret=data.slice(7, data.length)//Cut off the first Fast Acknowledge Packet
+   }else{
+      ret='error';
+   }  
+   return ret;
+}
 
 function S7AddrToBuffer(addrinfo, isWriting) {
 	var thisBitOffset = 0, theReq = new Buffer([0x12, 0x0a, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
