@@ -1,3 +1,9 @@
+Version: 0.1.12
+------------
+- Add more options for datatype syntax (thanks to sembaye)
+- Add support for RFC1006 fast acknowledge for old PLCs and WinAC RTX (thanks to sembaye)
+- Fix for onClientClose causing readAllItems to never return when connection closed by partner
+
 Version: 0.1.11
 ------------
 - Fix error when reading across multiple DBs
