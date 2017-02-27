@@ -1076,9 +1076,9 @@ NodeS7.prototype.onResponse = function(theData) {
 		});
 		self.isoclient.on('error', function() {
 			self.readWriteError.apply(self, arguments);
-		});		
+		});
 	}else if( data[7] === 0x32 ){//check the validy of FA+S7 package
-	
+
 		//*********************   VALIDY CHECK ***********************************
 		//TODO: Check S7-Header properly
 		if (data.length > 8 && data[8] != 3) {
@@ -1149,7 +1149,7 @@ NodeS7.prototype.onResponse = function(theData) {
 			//		setTimeout(self.connectNow, 2000, self.connectionParams);
 			return null;
 		}
-			
+
 	}else{
 		outputLog('INVALID READ RESPONSE - DISCONNECTING');
 		outputLog('TPKT Length From Header is ' + theData.readInt16BE(2) + ' and RCV buffer length is ' + theData.length + ' and COTP length is ' + theData.readUInt8(4) + ' and data[6] is ' + theData[6]);
@@ -1344,7 +1344,12 @@ NodeS7.prototype.onClientDisconnect = function() {
 NodeS7.prototype.onClientClose = function() {
 	var self = this;
     // clean up the connection now the socket has closed
-	self.connectionCleanup();
+		// We used to call self.connectionCleanup() here, but it caused problems.
+		// However - realize that this event is also called when the OTHER END of the connection sends a FIN packet.
+		// Certain situations (download user program to mem card on S7-400, pop memory card out of S7-300, both with NetLink) cause this to happen.
+		// So now, let's try a "connetionReset".  This way, we are guaranteed to return values (even if bad) and reset at the proper time.
+		// Without this, client applications had to be prepared for a read/write not returning.
+	self.connectionReset();
 
     // initiate the callback stored by dropConnection
     if (self.dropConnectionCallback) {
@@ -1411,14 +1416,14 @@ function checkRFCData(data){
    var TPKT_Length = data.readInt16BE(2);
    var TPDU_Code = data[5]; //Data==0xF0 !!
    var LastDataUnit = data[6];//empty fragmented frame => 0=not the last package; 1=last package
-  
+
    if(RFC_Version !==0x03 && TPDU_Code !== 0xf0){
       //Check if its an RFC package and a Data package
       return 'error';
    }else if((LastDataUnit >> 7) === 0 && TPKT_Length == data.length &&  data.length === 7){
-      // Check if its a Fast Acknowledge package from older PLCs or  WinAC or data is too long ... 
+      // Check if its a Fast Acknowledge package from older PLCs or  WinAC or data is too long ...
       // For example: <Buffer 03 00 00 07 02 f0 00> => data.length==7
-      ret='fastACK'; 
+      ret='fastACK';
    }else if((LastDataUnit >> 7) == 1 && TPKT_Length === data.length){
       // Check if its an  FastAcknowledge package + S7Data package
       // <Buffer 03 00 00 1b 02 f0 80 32 03 00 00 00 00 00 08 00 00 00 00 f0 00 00 01 00 01 00 f0> => data.length==7+20=27
@@ -1430,7 +1435,7 @@ function checkRFCData(data){
       ret=data.slice(7, data.length)//Cut off the first Fast Acknowledge Packet
    }else{
       ret='error';
-   }  
+   }
    return ret;
 }
 
