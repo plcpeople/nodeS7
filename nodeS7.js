@@ -1926,7 +1926,7 @@ function bufferizeS7Item(theItem) {
 			case "C":
 			case "CHAR":
 				// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
-				theItem.writeBuffer.writeUInt8(String.toCharCode(theItem.writeValue), thePointer);
+				theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(0), thePointer);
 				break;
 			case "TIMER":
 			case "COUNTER":

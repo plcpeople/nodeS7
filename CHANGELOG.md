@@ -1,3 +1,7 @@
+Version: 0.1.13
+------------
+- Fix bug when writing a single character
+
 Version: 0.1.12
 ------------
 - Add more options for datatype syntax (thanks to sembaye)
