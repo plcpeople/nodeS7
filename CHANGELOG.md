@@ -1,3 +1,7 @@
+Version: 0.1.14
+------------
+- Fix bug to handle the case when more than one packet is waiting in the incoming buffer
+
 Version: 0.1.13
 ------------
 - Fix bug when writing a single character
