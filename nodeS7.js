@@ -1424,7 +1424,7 @@ function checkRFCData(data){
       // Check if its a Fast Acknowledge package from older PLCs or  WinAC or data is too long ...
       // For example: <Buffer 03 00 00 07 02 f0 00> => data.length==7
       ret='fastACK';
-   }else if((LastDataUnit >> 7) == 1 && TPKT_Length === data.length){
+   }else if((LastDataUnit >> 7) == 1 && TPKT_Length <= data.length){
       // Check if its an  FastAcknowledge package + S7Data package
       // <Buffer 03 00 00 1b 02 f0 80 32 03 00 00 00 00 00 08 00 00 00 00 f0 00 00 01 00 01 00 f0> => data.length==7+20=27
       ret=data;
