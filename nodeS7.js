@@ -776,7 +776,7 @@ NodeS7.prototype.prepareReadPacket = function() {
 			self.globalReadBlockList[thisBlock].itemReference = [];
 			self.globalReadBlockList[thisBlock].itemReference.push(itemList[i]);
 		} else {
-			outputLog("Attempting optimization of item " + itemList[i].addr + " with " + self.globalReadBlockList[thisBlock].addr, 0, self.connectionID);
+			outputLog("Attempting optimization of item #" + i + ": " + itemList[i].addr + " with " + self.globalReadBlockList[thisBlock].addr, 0, self.connectionID);
 			// This next line checks the maximum.
 			// Think of this situation - we have a large request of 40 bytes starting at byte 10.
 			//	Then someone else wants one byte starting at byte 12.  The block length doesn't change.
