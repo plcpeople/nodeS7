@@ -1,3 +1,7 @@
+Version: 0.1.15
+------------
+- Ensure the socket is destroyed on connection cleanup
+
 Version: 0.1.14
 ------------
 - Fix bug to handle the case when more than one packet is waiting in the incoming buffer

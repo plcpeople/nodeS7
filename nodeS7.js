@@ -132,8 +132,6 @@ NodeS7.prototype.dropConnection = function(callback) {
 		// but also start a timer to destroy the connection in case we do not receive the close
 		self.dropConnectionTimer = setTimeout(function() {
 			if (self.dropConnectionCallback) {
-				// destroy the socket connection
-				self.isoclient.destroy();
 				// clean up the connection now the socket has closed
 				self.connectionCleanup();
 				// initate the callback
@@ -1394,6 +1392,8 @@ NodeS7.prototype.connectionCleanup = function() {
 	self.isoConnectionState = 0;
 	outputLog('Connection cleanup is happening');
 	if (typeof (self.isoclient) !== "undefined") {
+		// destroy the socket connection
+		self.isoclient.destroy();
 		self.isoclient.removeAllListeners('data');
 		self.isoclient.removeAllListeners('error');
 		self.isoclient.removeAllListeners('connect');
