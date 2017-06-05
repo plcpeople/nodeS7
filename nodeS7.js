@@ -246,8 +246,8 @@ NodeS7.prototype.onTCPConnect = function() {
 
 	connBuf = Buffer.from(self.connectReq);
 
-	if(self.localTSAP !== 'undefined' && self.remoteTSAP !== 'undefined') {
-		outputLog('Using localTSAP [' + self.localTSAP + '] and remoteTSAP [' + self.remoteTSAP + ']', 0, self.connectionID);
+	if(self.localTSAP !== null && self.remoteTSAP !== null) {
+		outputLog('Using localTSAP [0x' + self.localTSAP.toString(16) + '] and remoteTSAP [0x' + self.remoteTSAP.toString(16) + ']', 0, self.connectionID);
 		connBuf.writeUInt16BE(self.localTSAP, 16)
 		connBuf.writeUInt16BE(self.remoteTSAP, 20)
 	} else {
