@@ -72,6 +72,8 @@ function NodeS7(opts) {
 
 	self.rack = 0;
 	self.slot = 2;
+	self.localTSAP = null;
+	self.remoteTSAP = null;
 
 	self.readPacketArray = [];
 	self.writePacketArray = [];
@@ -109,6 +111,12 @@ NodeS7.prototype.initiateConnection = function(cParam, callback) {
 	}
 	if (typeof (cParam.slot) !== 'undefined') {
 		self.slot = cParam.slot;
+	}
+	if (typeof (cParam.localTSAP) !== 'undefined') {
+		self.localTSAP = cParam.localTSAP;
+	}
+	if (typeof (cParam.remoteTSAP) !== 'undefined') {
+		self.remoteTSAP = cParam.remoteTSAP;
 	}
 	if (typeof (cParam.connection_name) === 'undefined') {
 		self.connectionID = cParam.host + " S" + self.slot;
@@ -223,7 +231,7 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 }
 
 NodeS7.prototype.onTCPConnect = function() {
-	var self = this;
+	var self = this, connBuf;
 
 	outputLog('TCP Connection Established to ' + self.isoclient.remoteAddress + ' on port ' + self.isoclient.remotePort, 0, self.connectionID);
 	outputLog('Will attempt ISO-on-TCP connection', 0, self.connectionID);
@@ -236,9 +244,18 @@ NodeS7.prototype.onTCPConnect = function() {
 		self.packetTimeout.apply(self, arguments);
 	}, self.globalTimeout, "connect");
 
-	self.connectReq[21] = self.rack * 32 + self.slot;
+	connBuf = Buffer.from(self.connectReq);
 
-	self.isoclient.write(self.connectReq.slice(0, 22));
+	if(self.localTSAP !== null && self.remoteTSAP !== null) {
+		outputLog('Using localTSAP [0x' + self.localTSAP.toString(16) + '] and remoteTSAP [0x' + self.remoteTSAP.toString(16) + ']', 0, self.connectionID);
+		connBuf.writeUInt16BE(self.localTSAP, 16)
+		connBuf.writeUInt16BE(self.remoteTSAP, 20)
+	} else {
+		outputLog('Using rack [' + self.rack + '] and slot [' + self.slot + ']', 0, self.connectionID);
+		connBuf[21] = self.rack * 32 + self.slot;
+	}
+
+	self.isoclient.write(connBuf);
 
 	// Listen for a reply.
 	self.isoclient.on('data', function() {
