@@ -41,6 +41,7 @@ Example usage:
 	};	
 
 	conn.initiateConnection({port: 102, host: '192.168.0.2', rack: 0, slot: 1}, connected); // slot 2 for 300/400, slot 1 for 1200/1500
+	//conn.initiateConnection({port: 102, host: '192.168.0.2', localTSAP: 0x0100, remoteTSAP: 0x0200}, connected); // local and remote TSAP can also be directly specified instead
 
 	function connected(err) {
 		if (typeof(err) !== "undefined") {
