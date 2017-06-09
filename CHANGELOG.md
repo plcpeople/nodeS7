@@ -1,3 +1,7 @@
+Version: 0.2.0
+------------
+- Implement TSAP mode connection. Allows to directly specify local and remote TSAP values instead of only rack/slot. Useful for connecting with PLCs like Logo.
+
 Version: 0.1.15
 ------------
 - Ensure the socket is destroyed on connection cleanup
