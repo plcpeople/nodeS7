@@ -1,3 +1,7 @@
+Version: 0.2.1
+------------
+- Change from `Buffer.from()` to `buffer.slice()`, so we keep compatible with versions of NodeJS older than 6.x
+
 Version: 0.2.0
 ------------
 - Implement TSAP mode connection. Allows to directly specify local and remote TSAP values instead of only rack/slot. Useful for connecting with PLCs like Logo.

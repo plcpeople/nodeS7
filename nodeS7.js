@@ -244,7 +244,7 @@ NodeS7.prototype.onTCPConnect = function() {
 		self.packetTimeout.apply(self, arguments);
 	}, self.globalTimeout, "connect");
 
-	connBuf = Buffer.from(self.connectReq);
+	connBuf = self.connectReq.slice();
 
 	if(self.localTSAP !== null && self.remoteTSAP !== null) {
 		outputLog('Using localTSAP [0x' + self.localTSAP.toString(16) + '] and remoteTSAP [0x' + self.remoteTSAP.toString(16) + ']', 0, self.connectionID);
