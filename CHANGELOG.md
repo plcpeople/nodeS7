@@ -1,3 +1,7 @@
+Version: 0.2.2
+------------
+- Fix readDoneCallback typeof typo
+
 Version: 0.2.1
 ------------
 - Change from `Buffer.from()` to `buffer.slice()`, so we keep compatible with versions of NodeJS older than 6.x
