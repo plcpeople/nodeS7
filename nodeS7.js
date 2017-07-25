@@ -1656,10 +1656,11 @@ function processS7ReadItem(theItem) {
 
 	var thePointer = 0;
 	var strlen = 0;
+	var tempString = '';
 
 	if (theItem.arrayLength > 1) {
 		// Array value.
-		if (theItem.datatype != 'C' && theItem.datatype != 'CHAR' && theItem.datatype != 'S' && theItem.datatype != 'STRING') {
+		if (theItem.datatype != 'C' && theItem.datatype != 'CHAR') {
 			theItem.value = [];
 			theItem.quality = [];
 		} else {
@@ -1709,13 +1710,14 @@ function processS7ReadItem(theItem) {
 						break;
 					case "S":
 					case "STRING":
-						if (arrayIndex === 1) {
-							strlen = theItem.byteBuffer.readUInt8(thePointer);
-						}
-						if (arrayIndex > 1 && arrayIndex < (strlen + 2)) {  // say strlen = 1 (one-char string) this char is at arrayIndex of 2.
+						strlen = theItem.byteBuffer.readUInt8(thePointer+1);
+						tempString = '';
+						for (var charOffset = 2; charOffset < theItem.dtypelen && (charOffset - 2) < strlen; charOffset++) {
+							// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
 							// Convert to string.
-							theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer));
+							tempString += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer+charOffset));
 						}
+						theItem.value.push(tempString);
 						break;
 					case "C":
 					case "CHAR":
@@ -1778,7 +1780,16 @@ function processS7ReadItem(theItem) {
 					// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
 					theItem.value = theItem.byteBuffer.readUInt8(thePointer);
 					break;
-				// No support for single strings.
+				case "S":
+				case "STRING":
+					strlen = theItem.byteBuffer.readUInt8(thePointer+1);
+					theItem.value = '';
+					for (var charOffset = 2; charOffset < theItem.dtypelen && (charOffset - 2) < strlen; charOffset++) {
+						// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
+						// Convert to string.
+						theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer+charOffset));
+					}
+					break;
 				case "C":
 				case "CHAR":
 					// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
@@ -1876,15 +1887,15 @@ function bufferizeS7Item(theItem) {
 					break;
 				case "S":
 				case "STRING":
-					// Convert to string.
-					if (arrayIndex === 0) {
-						theItem.writeBuffer.writeUInt8(theItem.arrayLength - 2, thePointer); // Array length is requested val, -2 is string length
-					} else if (arrayIndex === 1) {
-						theItem.writeBuffer.writeUInt8(Math.min(theItem.arrayLength - 2, theItem.writeValue.length), thePointer);
-					} else if (arrayIndex > 1 && arrayIndex < (theItem.writeValue.length + 2)) {
-						theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(arrayIndex - 2), thePointer);
-					} else {
-						theItem.writeBuffer.writeUInt8(32, thePointer); // write space
+					// Convert to bytes.
+					theItem.writeBuffer.writeUInt8(theItem.dtypelen - 2, thePointer); // Array length is requested val, -2 is string length
+					theItem.writeBuffer.writeUInt8(Math.min(theItem.dtypelen - 2, theItem.writeValue[arrayIndex].length), thePointer+1); // Array length is requested val, -2 is string length
+					for (var charOffset = 2; charOffset < theItem.dtypelen; charOffset++) {
+						if (charOffset < (theItem.writeValue[arrayIndex].length + 2)) {
+							theItem.writeBuffer.writeUInt8(theItem.writeValue[arrayIndex].charCodeAt(charOffset-2), thePointer+charOffset);
+						} else {
+							theItem.writeBuffer.writeUInt8(32, thePointer+charOffset); // write space
+						}
 					}
 					break;
 				case "TIMER":
@@ -1945,6 +1956,20 @@ function bufferizeS7Item(theItem) {
 				// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
 				theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(0), thePointer);
 				break;
+			case "S":
+			case "STRING":
+				// Convert to bytes.
+				theItem.writeBuffer.writeUInt8(theItem.dtypelen - 2, thePointer); // Array length is requested val, -2 is string length
+				theItem.writeBuffer.writeUInt8(Math.min(theItem.dtypelen - 2, theItem.writeValue.length), thePointer+1); // Array length is requested val, -2 is string length
+
+				for (var charOffset = 2; charOffset < theItem.dtypelen; charOffset++) {
+					if (charOffset < (theItem.writeValue.length + 2)) {
+						theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(charOffset-2), thePointer+charOffset);
+					} else {
+						theItem.writeBuffer.writeUInt8(32, thePointer+charOffset); // write space
+					}
+				}
+				break;
 			case "TIMER":
 			case "COUNTER":
 				theItem.writeBuffer.writeInt16BE(theItem.writeValue, thePointer);
@@ -1977,6 +2002,12 @@ function stringToS7Addr(addr, useraddr) {
 		theItem.datatype = splitString2[0].replace(/[0-9]/gi, '').toUpperCase(); // Clear the numbers
 		if (theItem.datatype === 'X' && splitString2.length === 3) {
 			theItem.arrayLength = parseInt(splitString2[2], 10);
+		} else if ((theItem.datatype === 'S' || theItem.datatype === 'STRING') && splitString2.length === 3) {
+			theItem.dtypelen = parseInt(splitString2[1], 10) + 2; // With strings, add 2 to the length due to S7 header
+			theItem.arrayLength = parseInt(splitString2[2], 10);  // For strings, array length is now the number of strings
+		} else if ((theItem.datatype === 'S' || theItem.datatype === 'STRING') && splitString2.length === 2) {
+			theItem.dtypelen = parseInt(splitString2[1], 10) + 2; // With strings, add 2 to the length due to S7 header
+			theItem.arrayLength = 1;
 		} else if (theItem.datatype !== 'X' && splitString2.length === 2) {
 			theItem.arrayLength = parseInt(splitString2[1], 10);
 		} else {
@@ -2253,8 +2284,7 @@ function stringToS7Addr(addr, useraddr) {
 			break;
 		case "S":
 		case "STRING":
-			theItem.arrayLength += 2;
-			theItem.dtypelen = 1;
+			// For strings, arrayLength and dtypelen were assigned during parsing.
 			break;
 		default:
 			outputLog("Unknown data type " + theItem.datatype);

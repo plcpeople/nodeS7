@@ -26,7 +26,7 @@ To get started:
 
 Example usage:
 
-	var nodes7 = require('nodes7');
+	var nodes7 = require('nodes7');  // This is the package name, if the repository is cloned you may need to require 'nodeS7' with uppercase S
 	var conn = new nodes7;
 	var doneReading = false;
 	var doneWriting = false;
@@ -117,6 +117,7 @@ Examples:
 - DB10,INT6.2 - DB10.DBW6 and DB10.DBW8 in an array with length 2
 - PIW30 - PIW30 as INT
 - DB10,S20.30 - String at offset 20 with length of 30 (actual array length 32 due to format of String type, length byte will be read/written)
+- DB10,S20.30.3 - Array of 3 strings at offset 20, each with length of 30 (actual array length 32 due to format of String type, length byte will be read/written)
 - DB10,C22.30 - Character array at offset 22 with length of 30 (best to not use this with strings as length byte is ignored)
 
 In the example above, an object is declared and the `translator` references that object.  It could just as reference a file or database.  In any case, it allows cleaner Javascript code to be written that refers to a name instead of an absolute address.  

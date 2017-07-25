@@ -1,3 +1,7 @@
+Version: 0.2.3
+------------
+- Fix support for string arrays
+
 Version: 0.2.2
 ------------
 - Fix readDoneCallback typeof typo
