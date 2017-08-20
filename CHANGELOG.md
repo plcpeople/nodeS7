@@ -1,3 +1,7 @@
+Version: 0.2.4
+------------
+- Fix logging when slicing response packet from PLC
+
 Version: 0.2.3
 ------------
 - Fix support for string arrays
