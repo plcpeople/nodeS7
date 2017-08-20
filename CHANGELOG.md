@@ -1,3 +1,7 @@
+Version: 0.2.5
+------------
+- Fix request packet bigger than PDU size
+
 Version: 0.2.4
 ------------
 - Fix logging when slicing response packet from PLC

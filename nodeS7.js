@@ -875,6 +875,7 @@ NodeS7.prototype.prepareReadPacket = function() {
 
 		// Packet's expected reply length
 		var packetReplyLength = 12 + 2;  //
+		var packetRequestLength = 12; //s7 header and parameter header
 
 		self.readPacketArray.push(new S7Packet());
 		var thisPacketNumber = self.readPacketArray.length - 1;
@@ -885,7 +886,8 @@ NodeS7.prototype.prepareReadPacket = function() {
 
 		for (i = requestNumber; i < requestList.length; i++) {
 			//outputLog("Number is " + (requestList[i].byteLengthWithFill + 4 + packetReplyLength));
-			if (requestList[i].byteLengthWithFill + 4 + packetReplyLength > self.maxPDU) {
+			if (requestList[i].byteLengthWithFill + 4 + packetReplyLength > self.maxPDU || packetRequestLength + 12 > self.maxPDU) {
+				outputLog("Splitting request: " + numItems + " items, requestLength would be " + (packetRequestLength + 12) + ", replyLength would be " + (requestList[i].byteLengthWithFill + 4 + packetReplyLength) + ", PDU is " + self.maxPDU, 1, self.connectionID);
 				if (numItems === 0) {
 					outputLog("breaking when we shouldn't, rlibl " + requestList[i].byteLengthWithFill + " MBR " + maxByteRequest, 0, self.connectionID);
 					throw new Error("Somehow write request didn't split properly - exiting.  Report this as a bug.");
@@ -895,6 +897,7 @@ NodeS7.prototype.prepareReadPacket = function() {
 			requestNumber++;
 			numItems++;
 			packetReplyLength += (requestList[i].byteLengthWithFill + 4);
+			packetRequestLength += 12;
 			//outputLog('I is ' + i + ' Addr Type is ' + requestList[i].addrtype + ' and type is ' + requestList[i].datatype + ' and DBNO is ' + requestList[i].dbNumber + ' and offset is ' + requestList[i].offset + ' bit ' + requestList[i].bitOffset + ' len ' + requestList[i].arrayLength);
 			// skip this for now S7AddrToBuffer(requestList[i]).copy(self.readReq, 19 + numItems * 12);  // i or numItems?
 			self.readPacketArray[thisPacketNumber].itemList.push(requestList[i]);
