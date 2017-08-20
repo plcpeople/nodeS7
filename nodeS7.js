@@ -1105,7 +1105,7 @@ NodeS7.prototype.onResponse = function(theData) {
 		}
 		// The smallest read packet will pass a length check of 25.  For a 1-item write response with no data, length will be 22.
 		if (data.length > data.readInt16BE(2)) {
-			outputLog("An oversize packet was detected.  Excess length is " + data.length - data.readInt16BE(2) + ".  ");
+			outputLog("An oversize packet was detected.  Excess length is " + (data.length - data.readInt16BE(2)) + ".  ");
 			outputLog("We assume this is because two packets were sent at nearly the same time by the PLC.");
 			outputLog("We are slicing the buffer and scheduling the second half for further processing next loop.");
 			setTimeout(function() {
