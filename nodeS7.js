@@ -1418,7 +1418,10 @@ NodeS7.prototype.connectionCleanup = function() {
 		self.isoclient.removeAllListeners('error');
 		self.isoclient.removeAllListeners('connect');
 		self.isoclient.removeAllListeners('end');
-        self.isoclient.removeAllListeners('close');
+		self.isoclient.removeAllListeners('close');
+		self.isoclient.on('error',function() {
+			outputLog('TCP socket error following connection cleanup');
+		});
 	}
 	clearTimeout(self.connectTimeout);
 	clearTimeout(self.PDUTimeout);
