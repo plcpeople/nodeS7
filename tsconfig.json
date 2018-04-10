@@ -2,8 +2,9 @@
   "$schema":"http://json.schemastore.org/tsconfig",
   "compilerOptions": {
     "module": "commonjs",
-    "target": "es3",
-    "sourceMap": true
+    "sourceMap": true,
+    "strict": false,
+    "target": "es3"
   },
   "exclude": [
     "./node_modules/"
