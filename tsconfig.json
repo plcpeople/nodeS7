@@ -1,6 +1,7 @@
 {
   "$schema":"http://json.schemastore.org/tsconfig",
   "compilerOptions": {
+    "declaration": true,
     "module": "commonjs",
     "sourceMap": true,
     "strict": false,

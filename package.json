@@ -22,10 +22,11 @@
     "type": "git",
     "url": "https://github.com/plcpeople/nodeS7"
   },
-  "main": "nodeS7.js",
+  "main": "./nodeS7.js",
+  "types": "./nodeS7.d.ts",
   "engine": "node 0.10.x",
   "scripts": {
     "build": "tsc",
-    "postinstall": "npm run build"
+    "prepublish": "npm run build"
   }
 }
