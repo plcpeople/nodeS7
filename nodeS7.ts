@@ -2493,7 +2493,7 @@ function isQualityOK(obj) {
 	return true;
 }
 
-function outputLog(txt, debugLevel, id) {
+function outputLog(txt, debugLevel=undefined, id=undefined) {
 	if (silentMode) return;
 
 	var idtext;

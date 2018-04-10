@@ -1,5 +1,5 @@
 {
-  "$schema":"http://json.schemastore.org/package",
+  "$schema": "http://json.schemastore.org/package",
   "name": "nodes7",
   "description": "Routine to communicate with Siemens S7 PLCs",
   "devDependencies": {
@@ -25,7 +25,7 @@
   "main": "nodeS7.js",
   "engine": "node 0.10.x",
   "scripts": {
-    "build":"tsc",
+    "build": "tsc",
     "postinstall": "npm run build"
   }
 }
