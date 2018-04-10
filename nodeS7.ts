@@ -31,6 +31,8 @@
 // when using this library.  Test thoroughly in a laboratory environment.
 
 
+import {S7Packet} from "./src/S7Packet";
+
 var net = require("net");
 var util = require("util");
 var effectiveDebugLevel = 0; // intentionally global, shared between connections
@@ -2358,16 +2360,6 @@ function stringToS7Addr(addr, useraddr) {
 	if (theItem.byteLengthWithFill % 2) { theItem.byteLengthWithFill += 1; }  // S7 will add a filler byte.  Use this expected reply length for PDU calculations.
 
 	return theItem;
-}
-
-function S7Packet() {
-	this.seqNum = undefined;				// Made-up sequence number to watch for.
-	this.itemList = undefined;  			// This will be assigned the object that details what was in the request.
-	this.reqTime = undefined;
-	this.sent = false;						// Have we sent the packet yet?
-	this.rcvd = false;						// Are we waiting on a reply?
-	this.timeoutError = undefined;			// The packet is marked with error on timeout so we don't then later switch to good data.
-	this.timeout = undefined;				// The timeout for use with clearTimeout()
 }
 
 function S7Item() { // Object
