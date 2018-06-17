@@ -159,11 +159,20 @@ NodeS7.prototype.connectNow = function(cParam) {
 	// Don't re-trigger.
 	if (self.isoConnectionState >= 1) { return; }
 	self.connectionCleanup();
-	self.isoclient = net.connect(cParam, function() {
-		self.onTCPConnect.apply(self, arguments);
-	});
 
-	self.isoConnectionState = 1;  // 1 = trying to connect
+        self.isoclient = net.connect(cParam);                                                                                                                                        
+
+        self.isoclient.setTimeout(cParam.timeout || 5000, () => {                                                                                                                    
+          self.isoclient.destroy();                                                                                                                                            
+          self.connectError.apply(self, arguments);                                                                                                                            
+        });                                                                                                                                                                          
+
+        self.isoclient.once('connect', () => {                                                                                                                                       
+          socket.setTimeout(0);                                                                                                                                                
+          self.onTCPConnect.apply(self, arguments);                                                                                                                            
+        });                                                                                                                                                                          
+
+        self.isoConnectionState = 1;  // 1 = trying to connect  
 
 	self.isoclient.on('error', function() {
 		self.connectError.apply(self, arguments);
