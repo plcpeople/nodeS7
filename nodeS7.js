@@ -163,19 +163,19 @@ NodeS7.prototype.connectNow = function(cParam) {
         self.isoclient = net.connect(cParam);                                                                                                                                        
 
         self.isoclient.setTimeout(cParam.timeout || 5000, () => {                                                                                                                    
-          self.isoclient.destroy();                                                                                                                                            
-          self.connectError.apply(self, arguments);                                                                                                                            
+            self.isoclient.destroy();                                                                                                                                            
+            self.connectError.apply(self, arguments);                                                                                                                            
         });                                                                                                                                                                          
 
         self.isoclient.once('connect', () => {                                                                                                                                       
-          socket.setTimeout(0);                                                                                                                                                
-          self.onTCPConnect.apply(self, arguments);                                                                                                                            
+            self.isoclient.setTimeout(0);                                                                                                                                                
+            self.onTCPConnect.apply(self, arguments);                                                                                                                            
         });                                                                                                                                                                          
 
         self.isoConnectionState = 1;  // 1 = trying to connect  
 
 	self.isoclient.on('error', function() {
-		self.connectError.apply(self, arguments);
+            self.connectError.apply(self, arguments);
 	});
 
 	outputLog('<initiating a new connection ' + Date() + '>', 1, self.connectionID);
