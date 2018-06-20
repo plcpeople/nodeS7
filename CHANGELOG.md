@@ -1,9 +1,12 @@
+Version: 0.3.1
+------------
+- Fix bug related to variable timeout
+
 Version: 0.3.0
 ------------
 - Add variable timeout (thanks to babinc)
 - Add reference to MIT license to package.json
 - Use of arrow functions requires dropping support for very old versions of node
-
 
 Version: 0.2.5
 ------------
