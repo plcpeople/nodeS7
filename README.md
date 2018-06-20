@@ -5,26 +5,38 @@ NodeS7 is a library that allows communication to S7-300/400/1200/1500 PLCs using
 
 This software is not affiliated with Siemens in any way, nor am I.  S7-300, S7-400, S7-1200 and S7-1500 are trademarks of Siemens AG.
 
-WARNING - This is ALPHA CODE and you need to be aware that WRONG VALUES could be written to WRONG LOCATIONS.  Fully test everything you do.  In situations where writing to a random area of memory within the PLC could cost you money, back up your data and test this really well.  If this could injure someone or worse, consider other software.  
+WARNING
+=======
+This is ALPHA CODE and you need to be aware that WRONG VALUES could be written to WRONG LOCATIONS.  Fully test everything you do.  In situations where writing to a random area of memory within the PLC could cost you money, back up your data and test this really well.  If this could injure someone or worse, consider other software.  
 
-It is optimized in three ways - It sorts a large number of items being requested from the PLC and decides what overall data areas to request, then it groups multiple small requests together in a single packet or number of packets up to the maximum length the PLC supports, then it sends multiple packets at once, for maximum speed.   So a request for 100 different bits, all close (but not necessarily completely contiguous) will be grouped in one single request to the PLC, with no additional direction from the user.  
+Installation
+=======
+Using npm:
+* `npm install nodes7`
 
-NodeS7 manages reconnects for you.  So if the connection is lost because the PLC is powered down or disconnected, you can continue to request data with no other action necessary.  "Bad" values are returned, and eventually the connection will be automatically restored.
+Using yarn:
+* `yarn add nodes7`
 
-NodeS7 is written entirely in Javascript, so no compiler installation is necessary on Windows, and deployment on other platforms (ARM, etc) should be no problem.
+Optimization
+=======
 
-S7-1200 and S7-1500 CPU access requires access using "Slot 1" and you must disable optimized block access (in TIA portal) for the blocks you are using.  In addition, you must "Enable GET/PUT Access" in the 1500 controller in TIA Portal.  Doing so opens up the controller for other access by other applications as well, so be aware of the security implications of doing this.
+* It is optimized in three ways - It sorts a large number of items being requested from the PLC and decides what overall data areas to request, then it groups multiple small requests together in a single packet or number of packets up to the maximum length the PLC supports, then it sends multiple packets at once, for maximum speed.   So a request for 100 different bits, all close (but not necessarily completely contiguous) will be grouped in one single request to the PLC, with no additional direction from the user.  
 
-This has been tested only on direct connection to newer PROFINET CPUs and Helmholz NetLINK PRO COMPACT units.  It SHOULD work with any CP that supports TCP as well, but S7-200/400/1200 haven't been tested.  Very old CPUs have not been tested.  S7 routing is not supported.
+* NodeS7 manages reconnects for you.  So if the connection is lost because the PLC is powered down or disconnected, you can continue to request data with no other action necessary.  "Bad" values are returned, and eventually the connection will be automatically restored.
+
+* NodeS7 is written entirely in Javascript, so no compiler installation is necessary on Windows, and deployment on other platforms (ARM, etc) should be no problem.
+
+PLC Support
+=======
+* S7-1200 and S7-1500 CPU access requires access using "Slot 1" and you must disable optimized block access (in TIA portal) for the blocks you are using.  In addition, you must "Enable GET/PUT Access" in the 1500 controller in TIA Portal.  Doing so opens up the controller for other access by other applications as well, so be aware of the security implications of doing this.
+
+* This has been tested only on direct connection to newer PROFINET CPUs and Helmholz NetLINK PRO COMPACT units.  It SHOULD work with any CP that supports TCP as well, but S7-200/400/1200 haven't been tested.  Very old CPUs have not been tested.  S7 routing is not supported.
 
 Credit to the S7 Wireshark dissector plugin for help understanding why things were not working.
 (http://sourceforge.net/projects/s7commwireshark/)
 
-To get started:
-
-	npm install nodes7
-
-Example usage:
+Examples
+======
 
 	var nodes7 = require('nodes7');  // This is the package name, if the repository is cloned you may need to require 'nodeS7' with uppercase S
 	var conn = new nodes7;
@@ -72,9 +84,8 @@ Example usage:
 		if (doneReading) { process.exit(); }
 	}
 
-
-
-### API
+API
+=====
  - [initiateConnection()](#initiate-connection)
  - [dropConnection()](#drop-connection)
  - [setTranslationCB()](#set-translation-cb)
@@ -84,26 +95,45 @@ Example usage:
  - [readAllItems()](#read-all-items)
 
 
-#### <a name="initiate-connection"></a>nodes7.initiateConnection(params, callback)
+## <a name="initiate-connection"></a>nodes7.initiateConnection(options, callback)
+#### Description
 Connects to a PLC.  
 
-params should be an object with the following keys:
-- rack (default 0)
-- slot (default 2)
-- port (normally specify 102)
-- host (address)
+#### Arguments
 
-`callback(err)` will be executed on success or failure.  err is either an error object, or undefined on successful connection.
+###### Options
+| property | type     | default       |
+| ----     |---------:| -------------:|
+| rack       | number   | 0             |
+| slot       | number   | 2             |
+| port       | number   | 102           |
+| host       | string   | 192.168.8.106 |
+| localTSAP  | hex      | undefined |
+| remoteTSAP | hex      | undefined |
 
+###### Callback
+`callback(err)`
 
-#### <a name="drop-connection"></a>nodes7.dropConnection(callback)
-Disconnects from a PLC.  
+will be executed on success or failure.  err is either an error object, or undefined on successful connection.
 
-This simply terminates the TCP connection. The callback is called upon completion of the close.
+#### Returns
+undefined 
 
+## <a name="drop-connection"></a>nodes7.dropConnection(callback)
+#### Description
+Disconnects from a PLC. This simply terminates the TCP connection.
+#### Arguments
 
-#### <a name="set-translation-cb"></a>nodes7.setTranslationCB(translator)
-Sets a callback for name - address translation.  
+###### Callback
+`callback()`
+
+The callback is called upon completion of the close.
+
+#### Returns
+undefined
+
+## <a name="set-translation-cb"></a>nodes7.setTranslationCB(translator)
+Sets a callback for name - address translation.
 
 This is optional - you can choose to use "addItem" etc with absolute addresses.
 
@@ -123,27 +153,27 @@ Examples:
 In the example above, an object is declared and the `translator` references that object.  It could just as reference a file or database.  In any case, it allows cleaner Javascript code to be written that refers to a name instead of an absolute address.  
 
 
-#### <a name="add-items"></a>nodes7.addItems(items)
+## <a name="add-items"></a>nodes7.addItems(items)
 Adds `items` to the internal read polling list.  
 
 `items` can be a string or an array of strings.
 
 If `items` includes the value `_COMMERR` it will return current communication status.
 
-#### <a name="remove-items"></a>nodes7.removeItems(items)
+## <a name="remove-items"></a>nodes7.removeItems(items)
 Removes `items` to the internal read polling list.  
 
 `items` can be a string or an array of strings.
 
 If `items` is not defined then all items are removed.
 
-#### <a name="write-items"></a>nodes7.writeItems(items, values)
+## <a name="write-items"></a>nodes7.writeItems(items, values)
 Writes `items` to the PLC using the corresponding `values`.  
 
 `items` can be a string or an array of strings.  If `items` is a single string, `values` should then be a single item (or an array if `items` is an array item).  If `items` is an array of strings, `values` must be an array.
 
 
-#### <a name="read-all-items"></a>nodes7.readAllItems(callback)
+## <a name="read-all-items"></a>nodes7.readAllItems(callback)
 Reads the internal polling list and calls `callback` when done.  
 
 `callback(err, values)` is called with two arguments - a boolean indicating if ANY of the items have "bad quality", and `values`, an object containing the values being read as keys and their value (from the PLC) as the value.
