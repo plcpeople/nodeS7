@@ -102,15 +102,16 @@ Connects to a PLC.
 #### Arguments
 
 `Options`
-| property | type     | default       |
-| ----     |---------:| -------------:|
+
+|Property|type|default|
+| --- | --- | --- |
 | rack       | number   | 0             |
 | slot       | number   | 2             |
 | port       | number   | 102           |
 | host       | string   | 192.168.8.106 |
-| timeout    | number   | 5000 |
-| localTSAP  | hex      | undefined |
-| remoteTSAP | hex      | undefined |
+| timeout    | number   | 5000          |
+| localTSAP  | hex      | undefined     |
+| remoteTSAP | hex      | undefined     |
 
 `callback(err)`
 <dl>
