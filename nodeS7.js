@@ -409,11 +409,13 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 	self.instantWriteBlockList = []; // Initialize the array.
 
 	if (typeof arg === "string") {
-		self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
-		if (typeof (self.instantWriteBlockList[self.instantWriteBlockList.length - 1]) !== "undefined") {
-			self.instantWriteBlockList[self.instantWriteBlockList.length - 1].writeValue = value;
-		}
-	} else if (Array.isArray(arg) && Array.isArray(value) && (arg.length == value.length)) {
+		// transform into a list
+		arg   = self._transformStringToList(arg)
+		value = self._transformStringToList(value)
+		
+	} 
+	if (Array.isArray(arg) && Array.isArray(value) && (arg.length == value.length)) {
+		
 		for (i = 0; i < arg.length; i++) {
 			if (typeof arg[i] === "string") {
 				self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
@@ -422,6 +424,7 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 				}
 			}
 		}
+		
 	}
 
 	// Validity check.
@@ -459,8 +462,9 @@ NodeS7.prototype.addItemsNow = function(arg) {
 	var self = this, i;
 	outputLog("Adding " + arg, 0, self.connectionID);
 	if (typeof (arg) === "string" && arg !== "_COMMERR") {
-		self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
-	} else if (Array.isArray(arg)) {
+		arg = self._transformStringToList(arg)
+	} 
+	if (Array.isArray(arg)) {
 		for (i = 0; i < arg.length; i++) {
 			if (typeof (arg[i]) === "string" && arg[i] !== "_COMMERR") {
 				self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
@@ -488,19 +492,16 @@ NodeS7.prototype.removeItemsNow = function(arg) {
 	var self = this, i;
 	if (typeof arg === "undefined") {
 		self.polledReadBlockList = [];
-	} else if (typeof arg === "string") {
-		for (i = 0; i < self.polledReadBlockList.length; i++) {
-			outputLog('TCBA ' + self.translationCB(arg));
-			if (self.polledReadBlockList[i].addr === self.translationCB(arg)) {
-				outputLog('Splicing');
-				self.polledReadBlockList.splice(i, 1);
-			}
-		}
-	} else if (Array.isArray(arg)) {
-		for (i = 0; i < self.polledReadBlockList.length; i++) {
-			for (var j = 0; j < arg.length; j++) {
-				if (self.polledReadBlockList[i].addr === self.translationCB(arg[j])) {
-					self.polledReadBlockList.splice(i, 1);
+	} else {
+		if (typeof arg === "string") {
+			arg = self._transformStringToList(arg)
+		} 
+		if (Array.isArray(arg)) {
+			for (i = 0; i < self.polledReadBlockList.length; i++) {
+				for (var j = 0; j < arg.length; j++) {
+					if (self.polledReadBlockList[i].addr === self.translationCB(arg[j])) {
+						self.polledReadBlockList.splice(i, 1);
+					}
 				}
 			}
 		}
@@ -1436,6 +1437,14 @@ NodeS7.prototype.connectionCleanup = function() {
 	clearTimeout(self.PDUTimeout);
 	self.clearReadPacketTimeouts();  // Note this clears timeouts.
 	self.clearWritePacketTimeouts();  // Note this clears timeouts.
+}
+
+NodeS7.prototype._transformStringToList = function(arg) {
+	// transform into a list
+	tempArgList = [];
+	tempArgList.push(arg);
+	arg = tempArgList;
+	return arg
 }
 
 /**
