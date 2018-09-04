@@ -2255,8 +2255,7 @@ function stringToS7Addr(addr, useraddr) {
 			} else {
 				theItem.arrayLength = 1;
 			}
-		}
-		if (splitString2.length > 1 && theItem.datatype !== 'X') { // Bit and bit array
+		} else if (splitString2.length > 1 && theItem.datatype !== 'X') { // Bit and bit array
 			theItem.arrayLength = parseInt(splitString2[1].replace(/[A-z]/gi, ''), 10);
 		} else {
 			theItem.arrayLength = 1;
