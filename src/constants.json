@@ -1,0 +1,77 @@
+{
+    "proto": {
+        "ID": 50,
+        "VAR_SPEC": 18,
+        "type": {
+            "REQUEST": 1,
+            "RESPONSE": 3,
+            "USERDATA": 7
+        },
+        "function": {
+            "READ_VAR": 4,
+            "WRITE_VAR": 5,
+            "START_UPLOAD": 29,
+            "UPLOAD": 30,
+            "END_UPLOAD": 31,
+            "PI_SERVICE": 40,
+            "PLC_STOP": 41
+        },
+        "error": {
+            "OK": "0",
+            "FUNCTION_ALREADY_OCCUPIED": "32768",
+            "NOT_ALLOWED_IN_CURRENT_OPERATING_STATUS": "32769",
+            "HARDWARE_FAULT": "33025",
+            "OBJECT_ACCESS_NOT_ALLOWED": "33027",
+            "CONTEXT_IS_NOT_SUPPORTED": "33028",
+            "INVALID_ADDRESS": "33029",
+            "DATA_TYPE_NOT_SUPPORTED": "33030",
+            "DATA_TYPE_NOT_CONSISTENT": "33031",
+            "OBJECT_DOES_NOT_EXIST": "33034",
+            "INCORRECT_PDU_SIZE": "34048",
+            "ADDRESS_INVALID": "34562",
+            "BLOCK_NAME_SYNTAX_ERROR": "53761",
+            "SYNTAX_ERROR_FUNCTION_PARAMETER": "53762",
+            "SYNTAX_ERROR_BLOCK_TYPE": "53763",
+            "NO_LINKED_BLOCK_IN_STORAGE_MEDIUM": "53764",
+            "OBJECT_ALREADY_EXISTS_1": "53765",
+            "OBJECT_ALREADY_EXISTS_2": "53766",
+            "BLOCK_EXISTS_IN_EPROM": "53767",
+            "BLOCK_DOES_NOT_EXIST": "53769",
+            "NO_BLOCK_DOES_NOT_EXIST": "53774",
+            "BLOCK_NUMBER_TOO_BIG": "53776"
+        },
+        "errorCodeDesc" : {
+            "0": "ok",
+            "32768": "Function already occupied",
+            "32769": "Not allowed in current operating status",
+            "33025": "Hardware fault",
+            "33027": "Object access not allowed",
+            "33028": "Context is not supported",
+            "33029": "Invalid address",
+            "33030": "Data type not supported",
+            "33031": "Data type not consistent",
+            "33034": "Object does not exist",
+            "34048": "Incorrect PDU size",
+            "34562": "Address invalid",
+            "53761": "Block name syntax error",
+            "53762": "Syntax error function parameter",
+            "53763": "Syntax error block type",
+            "53764": "No linked block in storage medium",
+            "53765": "Object already exists",
+            "53766": "Object already exists",
+            "53767": "Block exists in EPROM",
+            "53769": "Block does not exist",
+            "53774": "No block does not exist",
+            "53776": "Block number too big"
+        }
+    },
+    "area": {
+        "PH": 128,
+        "PE": 129,
+        "PA": 130,
+        "MK": 131,
+        "DB": 132,
+        "CT": 28,
+        "TM": 29
+    }
+}
