@@ -82,6 +82,16 @@
             "LOCAL": 134,
             "V": 135
         },
+        "retval": {
+            "RESERVED": 0,
+            "DATA_HW_FAULT": 1,
+            "DATA_ACCESS_FAULT": 3,
+            "DATA_OUTOFRANGE": 5,
+            "DATA_NOT_SUP": 6,
+            "DATA_SIZEMISMATCH": 7,
+            "DATA_ERR": 10,
+            "DATA_OK": 255
+        },
         "userData": {
             "function": {
                 "MODE_TRANSITION": 0,
@@ -114,7 +124,22 @@
                     "BLOCKINFO": 3
                 },
                 "CPU_FUNC": {
-
+                    "READSZL": 1,
+                    "MSGS": 2,
+                    "DIAGMSG": 3,
+                    "ALARM8_IND": 5,
+                    "NOTIFY_IND": 6,
+                    "ALARM8LOCK": 7,
+                    "ALARM8UNLOCK": 8,
+                    "SCAN_IND": 9,
+                    "ALARMACK": 11,
+                    "ALARMACK_IND": 12,
+                    "ALARM8LOCK_IND": 13,
+                    "ALARM8UNLOCK_IND": 14,
+                    "ALARMSQ_IND": 17,
+                    "ALARMS_IND": 18,
+                    "ALARMQUERY": 19,
+                    "NOTIFY8_IND": 22
                 },
                 "SECURITY": {
                     "PASSWORD": 1
