@@ -1,23 +1,33 @@
 {
   "name": "nodes7",
   "description": "Routine to communicate with Siemens S7 PLCs",
-  "version": "0.3.1",
+  "version": "1.0.0",
   "author": {
-	"name": "Dana Moffit",
-	"email": "nodejsplc@gmail.com"
+    "name": "Dana Moffit",
+    "email": "nodejsplc@gmail.com"
   },
   "keywords": [
-	"S7",
-	"Siemens",
-	"PLC",
-	"RFC1006",
-	"iso-on-tcp"
+    "S7",
+    "Siemens",
+    "PLC",
+    "RFC1006",
+    "iso-on-tcp"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/plcpeople/nodeS7"
   },
   "main": "nodeS7.js",
+  "scripts": {
+    "test": "nyc --reporter=html --reporter=text --reporter=text-summary mocha --timeout=3000 test/**/**.spec.js",
+    "doc": "jsdoc -d doc/jsdoc/ -r -R README.md src/"
+  },
   "engine": "node 4.4.x",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "jsdoc": "^3.5.5",
+    "mocha": "^5.2.0",
+    "nyc": "^13.1.0"
+  }
 }
