@@ -161,10 +161,10 @@ class S7Parser extends Transform {
                     offset += 2;
                     obj.uploadID = chunk.readUInt32BE(offset);
                     offset += 4;
-                    let filenameLength = chunk.readUInt8(offset);
+                    let blockLengthLength = chunk.readUInt8(offset);
                     offset += 1;
-                    obj.filename = chunk.toString('ascii', offset, offset + filenameLength);
-                    offset += filenameLength;
+                    obj.blockLength = chunk.toString('ascii', offset, offset + blockLengthLength);
+                    offset += blockLengthLength;
                 }
                 break;
             case constants.proto.function.PLC_CONTROL:
@@ -296,18 +296,24 @@ class S7Parser extends Transform {
                 let dataLength = chunk.readUInt16BE(offset);
                 //also skips 2 more unknown bytes
                 offset += 4;
-                obj.payload = chunk.slice(offset, dataLength);
+                obj.payload = chunk.slice(offset, offset + dataLength);
                 offset += dataLength;
                 break;
             case constants.proto.function.WRITE_VAR:
+                obj.items = [];
+                for (let i = 0; i < param.itemCount; i++) {
+                    let returnCode = chunk.readUInt8(offset);
+                    offset += 1;
+                    obj.items.push({
+                        returnCode
+                    });
+                }
+                break;
             case constants.proto.function.READ_VAR:
                 obj.items = [];
                 for(let i = 0; i < param.itemCount; i++){
                     let returnCode = chunk.readUInt8(offset);
                     offset += 1;
-                    if (param.function == constants.proto.function.WRITE_VAR){
-                        continue;
-                    }
                     let transportSize = chunk.readUInt8(offset);
                     offset += 1;
                     let itemLenBytes = chunk.readUInt16BE(offset);
@@ -391,6 +397,7 @@ class S7Parser extends Transform {
             let obj = {};
 
             // S7 header
+            // 0x32 + type(1) + redundancyID(2) + pduReference(2) + parameterLength(2) + dataLength(2) [ + errorClass(1) + errorCode(1) ] = 10[12]
             let header = {};
 
             let protocolID = chunk.readUInt8(ptr);
