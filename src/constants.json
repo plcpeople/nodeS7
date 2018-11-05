@@ -543,7 +543,6 @@
                 "22893": "The existing network configuration does not mach the system requirements or configuration",
                 "22905": "Diagnostic message from DP interface: EXTF LED on",
                 "22908": "DP Global Control command failed or moved",
-                "22908": "DP command Global Control failure or moved",
                 "22944": "The interrupt can not be associated in the CPU",
                 "22945": "Configuration error in the integrated technology",
                 "22947": "Error when downloading the integrated technology",
