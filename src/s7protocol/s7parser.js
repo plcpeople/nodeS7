@@ -96,26 +96,20 @@ class S7Parser extends Transform {
                 offset += 7;
                 let paramLength = chunk.readUInt16BE(offset);
                 offset += 2;
-                if(paramLength){
-                    obj.parameter = chunk.toString('ascii', offset, offset + paramLength);
-                    offset += paramLength;
-                }
+                obj.parameter = chunk.toString('ascii', offset, offset + paramLength);
+                offset += paramLength;
                 let serviceLength = chunk.readUInt8(offset);
                 offset += 1;
-                if (serviceLength) {
-                    obj.piService = chunk.toString('ascii', offset, offset + serviceLength);
-                    offset += serviceLength;
-                }
+                obj.piService = chunk.toString('ascii', offset, offset + serviceLength);
+                offset += serviceLength;
                 break;
             case constants.proto.function.PLC_STOP:
                 //skip 5 unknown bytes
                 offset += 5;
                 let piLength = chunk.readUInt8(offset);
                 offset += 1;
-                if(piLength){
-                    obj.piService = chunk.toString('ascii', offset, offset + piLength);
-                    offset += piLength;
-                }
+                obj.piService = chunk.toString('ascii', offset, offset + piLength);
+                offset += piLength;
                 break;
             case constants.proto.function.COMM_SETUP:
                 //skip 1 unknown byte
@@ -168,30 +162,7 @@ class S7Parser extends Transform {
                 }
                 break;
             case constants.proto.function.PLC_CONTROL:
-                //skip 7 unknown bytes
-                offset += 7;
-                let paramLength = chunk.readUInt16BE(offset);
-                offset += 2;
-                if(paramLength){
-                    obj.parameter = chunk.toString('ascii', offset, offset + paramLength);
-                    offset += paramLength;
-                }
-                let serviceLength = chunk.readUInt8(offset);
-                offset += 1;
-                if (serviceLength) {
-                    obj.piService = chunk.toString('ascii', offset, offset + serviceLength);
-                    offset += serviceLength;
-                }
-                break;
             case constants.proto.function.PLC_STOP:
-                //skip 5 unknown bytes
-                offset += 5;
-                let piLength = chunk.readUInt8(offset);
-                offset += 1;
-                if(piLength){
-                    obj.piService = chunk.toString('ascii', offset, offset + piLength);
-                    offset += piLength;
-                }
                 break;
             case constants.proto.function.COMM_SETUP:
                 //skip 1 unknown byte

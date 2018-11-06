@@ -672,4 +672,129 @@ describe('S7Protocol Parser Parser', () => {
 
         parser.write(Buffer.from('320300000a000001000000001f', 'hex'));
     });
+
+    it('should decode a Request -> PLC Stop', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.REQUEST,
+                    rid: 0,
+                    pduReference: 0x1c00
+                },
+                param: {
+                    function: constants.proto.function.PLC_STOP,
+                    piService: "P_PROGRAM"
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320100001c000010000029000000000009505f50524f4752414d', 'hex'));
+    });
+
+    it('should decode a Response -> PLC Stop', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 0x1c00,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.PLC_STOP
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320300001c0000010000000029', 'hex'));
+    });
+
+    it('should decode a Request -> PLC Control -> Copy RAM to ROM', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.REQUEST,
+                    rid: 0,
+                    pduReference: 0x1d00
+                },
+                param: {
+                    function: constants.proto.function.PLC_CONTROL,
+                    parameter: "EP",
+                    piService: "_MODU"
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320100001d000012000028000000000000fd00024550055f4d4f4455', 'hex'));
+    });
+
+    it('should decode a Response -> PLC Control -> Copy RAM to ROM', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 0x1d00,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.PLC_CONTROL
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320300001d0000010000000028', 'hex'));
+    });
+
+    it('should decode a Request -> PLC Control -> Compress PLC Memory', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.REQUEST,
+                    rid: 0,
+                    pduReference: 0x1e00
+                },
+                param: {
+                    function: constants.proto.function.PLC_CONTROL,
+                    parameter: "", //no parameter
+                    piService: "_GARB"
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320100001e000010000028000000000000fd0000055f47415242', 'hex'));
+    });
+
+    it('should decode a Response -> PLC Control -> Compress PLC Memory', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 0x1d00,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.PLC_CONTROL
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320300001d0000010000000028', 'hex'));
+    });
 });
