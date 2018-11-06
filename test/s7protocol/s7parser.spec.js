@@ -28,7 +28,7 @@ const S7Parser = require('../../src/s7protocol/s7parser.js');
 const constants = require('../../src/constants.json');
 const Stream = require('stream');
 
-describe('S7Protocol Parser Parser', () => {
+describe('S7Protocol Parser', () => {
 
     it('should be a stream', () => {
         expect(new S7Parser()).to.be.instanceOf(Stream);
