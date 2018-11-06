@@ -797,4 +797,22 @@ describe('S7Protocol Parser', () => {
 
         parser.write(Buffer.from('320300001d0000010000000028', 'hex'));
     });
+
+    it('should decode an ACK with an error', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.ACK,
+                    rid: 0,
+                    pduReference: 0x000c,
+                    errorClass: 0x81,
+                    errorCode: 0x04,
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('32020000000c000000008104', 'hex'));
+    });
 });

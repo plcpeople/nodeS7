@@ -393,7 +393,7 @@ class S7Parser extends Transform {
             let dataLength = chunk.readUInt16BE(ptr);
             ptr += 2;
 
-            if (header.type == constants.proto.type.RESPONSE){
+            if (header.type == constants.proto.type.RESPONSE || header.type == constants.proto.type.ACK) {
                 header.errorClass = chunk.readUInt8(ptr);
                 ptr += 1;
                 header.errorCode = chunk.readUInt8(ptr);
