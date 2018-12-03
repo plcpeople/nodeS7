@@ -17,7 +17,8 @@
     "type": "git",
     "url": "https://github.com/plcpeople/nodeS7"
   },
-  "main": "nodeS7.js",
+  "main_old": "nodeS7.js",
+  "main": "src/index.js",
   "scripts": {
     "test": "nyc --reporter=html --reporter=text --reporter=text-summary mocha --timeout=3000 test/**/**.spec.js",
     "doc": "jsdoc -d doc/jsdoc/ -r -R README.md src/"
