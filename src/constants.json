@@ -93,6 +93,10 @@
             "DATA_OK": 255
         },
         "userData": {
+            "type": {
+                "REQUEST": 4,
+                "RESPONSE": 8
+            },
             "function": {
                 "MODE_TRANSITION": 0,
                 "PROG_COMMAND": 1,

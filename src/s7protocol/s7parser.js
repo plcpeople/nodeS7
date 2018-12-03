@@ -211,6 +211,10 @@ class S7Parser extends Transform {
             offset += 2;
         }
 
+        //some helpers
+        obj.isRequest = obj.type === constants.proto.userData.type.REQUEST;
+        obj.isResponse = obj.type === constants.proto.userData.type.RESPONSE;
+
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
             return new Error(`Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
