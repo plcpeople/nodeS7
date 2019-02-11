@@ -91,6 +91,8 @@ function NodeS7(opts) {
 	self.connectCBIssued = false;
 	self.dropConnectionCallback = null;
 	self.dropConnectionTimer = null;
+	self.reconnectTimer = undefined;
+	self.rereadTimer = undefined;
 }
 
 NodeS7.prototype.setTranslationCB = function(cb) {
@@ -131,6 +133,17 @@ NodeS7.prototype.initiateConnection = function(cParam, callback) {
 
 NodeS7.prototype.dropConnection = function(callback) {
 	var self = this;
+
+	// prevents triggering reconnection even after calling dropConnection (fixes #70)
+	clearTimeout(self.reconnectTimer);
+	clearTimeout(self.rereadTimer);
+	clearTimeout(self.connectTimeout);
+	clearTimeout(self.PDUTimeout);
+	self.reconnectTimer = undefined;
+	self.rereadTimer = undefined;
+	self.connectTimeout = undefined;
+	self.PDUTimeout = undefined;
+
 	if (typeof (self.isoclient) !== 'undefined') {
 		// store the callback and request and end to the connection
 		self.dropConnectionCallback = callback;
@@ -156,6 +169,11 @@ NodeS7.prototype.dropConnection = function(callback) {
 
 NodeS7.prototype.connectNow = function(cParam) {
 	var self = this;
+
+	// prevents any reconnect timer to fire this again
+	clearTimeout(self.reconnectTimer);
+	self.reconnectTimer = undefined;
+
 	// Don't re-trigger.
 	if (self.isoConnectionState >= 1) { return; }
 	self.connectionCleanup();
@@ -209,7 +227,8 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 		outputLog("Wait for 2 seconds then try again.", 0, self.connectionID);
 		self.connectionReset();
 		outputLog("Scheduling a reconnect from packetTimeout, connect type", 0, self.connectionID);
-		setTimeout(function() {
+		clearTimeout(self.reconnectTimer);
+		self.reconnectTimer = setTimeout(function() {
 			outputLog("The scheduled reconnect from packetTimeout, connect type, is happening now", 0, self.connectionID);
 			self.connectNow.apply(self, arguments);
 		}, 2000, self.connectionParams);
@@ -220,7 +239,8 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 		outputLog("Wait for 2 seconds then try again.", 0, self.connectionID);
 		self.connectionReset();
 		outputLog("Scheduling a reconnect from packetTimeout, connect type", 0, self.connectionID);
-		setTimeout(function() {
+		clearTimeout(self.reconnectTimer);
+		self.reconnectTimer = setTimeout(function() {
 			outputLog("The scheduled reconnect from packetTimeout, PDU type, is happening now", 0, self.connectionID);
 			self.connectNow.apply(self, arguments);
 		}, 2000, self.connectionParams);
@@ -384,7 +404,8 @@ NodeS7.prototype.onPDUReply = function(theData) {
 		outputLog('TPKT Length From Header is ' + theData.readInt16BE(2) + ' and RCV buffer length is ' + theData.length + ' and COTP length is ' + theData.readUInt8(4) + ' and data[6] is ' + theData[6], 0, self.connectionID);
 		outputLog(theData);
 		self.isoclient.end();
-		setTimeout(function() {
+		clearTimeout(self.reconnectTimer);
+		self.reconnectTimer = setTimeout(function() {
 			self.connectNow.apply(self, arguments);
 		}, 2000, self.connectionParams);
 		return null;
@@ -527,7 +548,9 @@ NodeS7.prototype.readAllItems = function(arg) {
 	// Check if ALL are done...  You might think we could look at parallel jobs, and for the most part we can, but if one just finished and we end up here before starting another, it's bad.
 	if (self.isWaiting()) {
 		outputLog("Waiting to read for all R/W operations to complete.  Will re-trigger readAllItems in 100ms.", 0, self.connectionID);
-		setTimeout(function() {
+		clearTimeout(self.rereadTimer);
+		self.rereadTimer = setTimeout(function() {
+			self.rereadTimer = undefined; //already fired, can safely discard
 			self.readAllItems.apply(self, arguments);
 		}, 100, arg);
 		return;
@@ -970,7 +993,8 @@ NodeS7.prototype.sendReadPacket = function() {
 
 	if (flagReconnect) {
 		//		console.log("Asking for callback next tick and my ID is " + self.connectionID);
-		setTimeout(function() {
+		clearTimeout(self.reconnectTimer)
+		self.reconnectTimer = setTimeout(function() {
 			//			console.log("Next tick is here and my ID is " + self.connectionID);
 			outputLog("The scheduled reconnect from sendReadPacket is happening now", 1, self.connectionID);
 			self.connectNow(self.connectionParams);  // We used to do this NOW - not NextTick() as we need to mark isoConnectionState as 1 right now.  Otherwise we queue up LOTS of connects and crash.
@@ -1054,7 +1078,8 @@ NodeS7.prototype.sendWritePacket = function() {
 	}
 	if (flagReconnect) {
 		//		console.log("Asking for callback next tick and my ID is " + self.connectionID);
-		setTimeout(function() {
+		clearTimeout(self.reconnectTimer);
+		self.reconnectTimer = setTimeout(function() {
 			//			console.log("Next tick is here and my ID is " + self.connectionID);
 			outputLog("The scheduled reconnect from sendWritePacket is happening now", 1, self.connectionID);
 			self.connectNow(self.connectionParams);  // We used to do this NOW - not NextTick() as we need to mark isoConnectionState as 1 right now.  Otherwise we queue up LOTS of connects and crash.
