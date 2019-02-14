@@ -418,7 +418,7 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 	outputLog("Preparing to WRITE " + arg + " to value " + value, 0, self.connectionID);
 	if (self.isWriting()) {
 		outputLog("You must wait until all previous writes have finished before scheduling another. ", 0, self.connectionID);
-		return;
+		return 1;  // Watch for this in your code - 1 means it hasn't actually entered into the queue.
 	}
 
 	if (typeof cb === "function") {
@@ -458,6 +458,7 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 	} else {
 		self.writeInQueue = true;
 	}
+	return 0;
 }
 
 
