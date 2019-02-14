@@ -1,3 +1,8 @@
+Version: 0.3.2
+------------
+- Fix bug related to bit array length (thanks to luisbardalez)
+- Better tracking of timers during dropConnection (thanks to gfcittolin)
+
 Version: 0.3.1
 ------------
 - Fix bug related to variable timeout

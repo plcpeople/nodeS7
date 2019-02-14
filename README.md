@@ -170,9 +170,11 @@ Removes `items` to the internal read polling list.
 
 If `items` is not defined then all items are removed.
 
-## <a name="write-items"></a>nodes7.writeItems(items, values)
+## <a name="write-items"></a>nodes7.writeItems(items, values, callback)
 #### Description
-Writes `items` to the PLC using the corresponding `values`.
+Writes `items` to the PLC using the corresponding `values` and calls `callback` when done.
+
+You should monitor the return value - if it is non-zero, the write will not be processed as there is already one it progress, and the callback will not be called.
 
 #### Arguments
 `items` can be a string or an array of strings.
@@ -181,6 +183,12 @@ If `items` is a single string, `values` should then be a single item.
 
 If `items` is an array of strings, `values` must also be an array of values.
 
+`callback(err)`
+
+<dl>
+  <dt>err</dt>
+  <dd>a boolean indicating if ANY of the items have "bad quality".</dd>
+</dl>
 
 ## <a name="read-all-items"></a>nodes7.readAllItems(callback)
 #### Description
