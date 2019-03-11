@@ -26,9 +26,13 @@
   "engine": "node 4.4.x",
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "^11.11.0",
     "chai": "^4.2.0",
     "jsdoc": "^3.5.5",
     "mocha": "^5.2.0",
     "nyc": "^13.1.0"
+  },
+  "dependencies": {
+    "iso-on-tcp": "0.1.0-beta.0"
   }
 }
