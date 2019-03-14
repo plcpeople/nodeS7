@@ -41,7 +41,9 @@ class S7Parser extends Transform {
         debug("new S7Parser");
     }
 
-    _parseRequestParameter(chunk, offset, length){
+    _parseRequestParameter(chunk, offset, length) {
+        debug("S7Parser _parseRequestParameter", offset, length);
+
         let obj = {}, offsetStart = offset;
 
         obj.function = chunk.readUInt8(offset);
@@ -134,6 +136,8 @@ class S7Parser extends Transform {
     }
 
     _parseResponseParameter(chunk, offset, length) {
+        debug("S7Parser _parseResponseParameter", offset, length);
+
         let obj = {}, offsetStart = offset;
 
         obj.function = chunk.readUInt8(offset);
@@ -187,6 +191,8 @@ class S7Parser extends Transform {
     }
 
     _parseUserDataParameter(chunk, offset, length) {
+        debug("S7Parser _parseUserDataParameter", offset, length);
+
         let obj = {}, offsetStart = offset;
 
         obj.head = chunk.readUIntBE(offset, 3);
@@ -223,7 +229,9 @@ class S7Parser extends Transform {
         return obj;
     }
 
-    _parseRequestData(chunk, offset, length, param){
+    _parseRequestData(chunk, offset, length, param) {
+        debug("S7Parser _parseRequestData", offset, length, param);
+
         let obj = {}, offsetStart = offset;
 
         switch (param.function) {
@@ -248,6 +256,10 @@ class S7Parser extends Transform {
                         data: chunk.slice(offset, offset + itemLenBytes)
                     });
                     offset += itemLenBytes;
+                    if ((itemLenBytes % 2) && (i < param.items.length - 1)) {
+                        // items are padded with a null byte if length is even, and not the last one
+                        offset += 1;
+                    }
                 }
                 break;
             default:
@@ -263,7 +275,9 @@ class S7Parser extends Transform {
         return obj;
     }
 
-    _parseResponseData(chunk, offset, length, param){
+    _parseResponseData(chunk, offset, length, param) {
+        debug("S7Parser _parseResponseData", offset, length, param);
+
         let obj = {}, offsetStart = offset;
 
         switch (param.function) {
@@ -305,6 +319,10 @@ class S7Parser extends Transform {
                         data: chunk.slice(offset, offset + itemLenBytes)
                     });
                     offset += itemLenBytes;
+                    if ((itemLenBytes % 2) && (i < param.itemCount - 1)) {
+                        // items are padded with a null byte if length is even, and not the last one
+                        offset += 1;
+                    }
                 }
                 break;
             default:
@@ -320,7 +338,9 @@ class S7Parser extends Transform {
         return obj;
     }
 
-    _parseUserDataData(chunk, offset, length, param){
+    _parseUserDataData(chunk, offset, length, param) {
+        debug("S7Parser _parseUserDataData", offset, length, param);
+        
         let obj = {}, offsetStart = offset;
 
         obj.returnCode = chunk.readUInt8(offset);
@@ -350,7 +370,7 @@ class S7Parser extends Transform {
     }
 
     _transform(chunk, encoding, cb) {
-        debug("S7Parser _transform");
+        debug("S7Parser _transform", chunk);
 
         let ptr = 0;
 

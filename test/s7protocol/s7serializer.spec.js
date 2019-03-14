@@ -280,6 +280,88 @@ describe('S7Protocol Serializer', () => {
         });
     });
 
+    it('should encode a Request -> ReadVar (with padding)', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            expect(data.toString('hex')).to.be.equal('320100000001002600000403120a10020001000083000000120a10020001000083000000120a10020001000083000000');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.REQUEST,
+                rid: 0,
+                pduReference: 0x0001
+            },
+            param: {
+                function: constants.proto.function.READ_VAR,
+                items: [
+                    {
+                        syntax: constants.proto.syntax.S7ANY,
+                        transport: constants.proto.transport.BYTE,
+                        area: constants.proto.area.FLAGS,
+                        db: 0,
+                        address: 0,
+                        length: 1
+                    },
+                    {
+                        syntax: constants.proto.syntax.S7ANY,
+                        transport: constants.proto.transport.BYTE,
+                        area: constants.proto.area.FLAGS,
+                        db: 0,
+                        address: 0,
+                        length: 1
+                    },
+                    {
+                        syntax: constants.proto.syntax.S7ANY,
+                        transport: constants.proto.transport.BYTE,
+                        area: constants.proto.area.FLAGS,
+                        db: 0,
+                        address: 0,
+                        length: 1
+                    }
+                ]
+            }
+        });
+    });
+
+    it('should encode a Response -> ReadVar (with padding)', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            expect(data.toString('hex')).to.be.equal('3203000000010002001100000403ff0400085800ff0400085800ff04000858');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.RESPONSE,
+                rid: 0,
+                pduReference: 0001,
+                errorCode: 0,
+                errorClass: 0
+            },
+            param: {
+                function: constants.proto.function.READ_VAR,
+                itemCount: 3
+            },
+            data: {
+                items: [{
+                    returnCode: constants.proto.retval.DATA_OK,
+                    transportSize: constants.proto.dataTransport.BBYTE,
+                    data: Buffer.from('58', 'hex')
+                }, {
+                    returnCode: constants.proto.retval.DATA_OK,
+                    transportSize: constants.proto.dataTransport.BBYTE,
+                    data: Buffer.from('58', 'hex')
+                }, {
+                    returnCode: constants.proto.retval.DATA_OK,
+                    transportSize: constants.proto.dataTransport.BBYTE,
+                    data: Buffer.from('58', 'hex')
+                }]
+            }
+        });
+    });
+
     it('should encode a Request -> WriteVar', (done) => {
         let serializer = new S7Serializer();
         serializer.on('data', (data) => {

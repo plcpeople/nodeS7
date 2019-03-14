@@ -178,6 +178,51 @@ describe('S7Protocol Parser', () => {
         parser.write(Buffer.from('320100001b00003e00000405120a10020010000083000000120a10020010000081000000120a10020010000082000000120a101d000800001d000000120a101c000800001c000000', 'hex'));
     });
 
+    it('should decode a Request -> ReadVar (with padding)', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.REQUEST,
+                    rid: 0,
+                    pduReference: 0x0001
+                },
+                param: {
+                    function: constants.proto.function.READ_VAR,
+                    items: [
+                        {
+                            syntax: constants.proto.syntax.S7ANY,
+                            transport: constants.proto.transport.BYTE,
+                            area: constants.proto.area.FLAGS,
+                            db: 0,
+                            address: 0,
+                            length: 1
+                        },
+                        {
+                            syntax: constants.proto.syntax.S7ANY,
+                            transport: constants.proto.transport.BYTE,
+                            area: constants.proto.area.FLAGS,
+                            db: 0,
+                            address: 0,
+                            length: 1
+                        },
+                        {
+                            syntax: constants.proto.syntax.S7ANY,
+                            transport: constants.proto.transport.BYTE,
+                            area: constants.proto.area.FLAGS,
+                            db: 0,
+                            address: 0,
+                            length: 1
+                        }
+                    ]
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320100000001002600000403120a10020001000083000000120a10020001000083000000120a10020001000083000000', 'hex'));
+    });
+
     it('should decode a Request -> WriteVar', (done) => {
         let parser = new S7Parser();
         parser.on('data', (data) => {
@@ -362,6 +407,43 @@ describe('S7Protocol Parser', () => {
         });
 
         parser.write(Buffer.from('320300001b000002006400000405ff040080acde000daddeaddeaddeaddeaddeaddeff040080aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbff040080bbbbbbbbbbbbbbbbaddeaddeaddeaddeff09001000000000000000000000000000000000ff09001000110000000000000000000000000000', 'hex'));
+    });
+
+    it('should decode a Response -> ReadVar (with padding)', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 0001,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.READ_VAR,
+                    itemCount: 3
+                },
+                data: {
+                    items: [{
+                        returnCode: constants.proto.retval.DATA_OK,
+                        transportSize: constants.proto.dataTransport.BBYTE,
+                        data: Buffer.from('58', 'hex')
+                    },{
+                        returnCode: constants.proto.retval.DATA_OK,
+                        transportSize: constants.proto.dataTransport.BBYTE,
+                        data: Buffer.from('58', 'hex')
+                    },{
+                        returnCode: constants.proto.retval.DATA_OK,
+                        transportSize: constants.proto.dataTransport.BBYTE,
+                        data: Buffer.from('58', 'hex')
+                    }]
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('3203000000010002001100000403ff0400085800ff0400085800ff04000858', 'hex'));
     });
 
     it('should decode a Response -> WriteVar', (done) => {

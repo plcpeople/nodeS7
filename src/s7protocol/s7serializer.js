@@ -66,6 +66,10 @@ function serializeDataItems(buf, items, ptr) {
         ptr += 2;
         elm.data.copy(buf, ptr);
         ptr += elm.data.length;
+        if ((elm.data.length % 2) && (i < items.length - 1)){
+            //pad even data fields
+            ptr += 1;
+        }
     }
     return ptr;
 }
@@ -111,8 +115,13 @@ class S7Serializer extends Transform {
                 
                 parameterLength = 2 + (chunk.param.items.length * 12);
                 if (chunk.param.function == constants.proto.function.WRITE_VAR) {
-                    for(let e of chunk.data.items){
+                    for(let i = 0; i < chunk.data.items.length; i++){
+                        let e = chunk.data.items[i]
                         dataLength += 4 + e.data.length;
+                        if ((e.data.length % 2) && (i < chunk.data.items.length)){
+                            // padding if data is even, but not the last one
+                            dataLength += 1;
+                        }
                     }
                 }
                 buf = Buffer.alloc(10 + parameterLength + dataLength);
@@ -188,7 +197,7 @@ class S7Serializer extends Transform {
     }
 
     _serializeResponse(chunk) {
-        debug("S7Serializer _serializeUserData");
+        debug("S7Serializer _serializeResponse");
         let buf, parameterLength, dataLength = 0;
 
         //we're skipping a lot of validations, since we expect the upper layers to do that
@@ -203,8 +212,13 @@ class S7Serializer extends Transform {
                 
                 parameterLength = 2;
                 if (chunk.param.function == constants.proto.function.READ_VAR) {
-                    for(let e of chunk.data.items){
+                    for(let i = 0; i < chunk.data.items.length; i++){
+                        let e = chunk.data.items[i];
                         dataLength += 4 + e.data.length;
+                        if ((e.data.length % 2) && (i < chunk.data.items.length - 1)) {
+                            // padding if data is even, but not the last one
+                            dataLength += 1;
+                        }
                     }
                 } else {
                     dataLength = chunk.data.items.length;
