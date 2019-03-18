@@ -101,7 +101,7 @@ class S7Connection extends EventEmitter {
     _onParserError(e) {
         debug('S7Connection _onParserError', e);
         this.emit('error', e);
-        //TODO - probably needs to destroy connection
+        this.destroy(); //abort connection if we can't understand what we're receiving
     }
     
     _onSerializerError(e) {
@@ -187,9 +187,9 @@ class S7Connection extends EventEmitter {
         let job = this._jobInProcess.get(pdu);
         this._jobInProcess.delete(pdu);
 
-        job.rej(new Error("Request timeout"));
+        if (job) job.rej(new Error("Request timeout"));
 
-        this.emit('timeout', job);
+        this.emit('timeout');
     }
 
     _processQueue() {
@@ -272,10 +272,14 @@ class S7Connection extends EventEmitter {
     }
 
     /**
-     * Disconnects from PLC
+     * Finishes this connection instance by cancelling all 
+     * pending jobs and destroying all internal objects
      */
-    disconnect() {
+    destroy() {
         debug('S7Connection disconnect');
+
+        if(this._connectionState == CONN_DISCONNECTED) return;
+
         this._connectionState = CONN_DISCONNECTED;
 
         this.clearQueue();
@@ -283,6 +287,18 @@ class S7Connection extends EventEmitter {
             job.rej(new Error("Disconnected"));
         });
         this._jobInProcess.clear();
+
+        function destroySafe(stream){
+            //handles older NodeJS versions
+            if(stream.destroy){
+                stream.destroy();
+            } else if (stream._destroy){
+                stream._destroy();
+            }
+        }
+
+        destroySafe(this._serializer);
+        destroySafe(this._parser);
     }
 
     /**
@@ -300,6 +316,10 @@ class S7Connection extends EventEmitter {
             if (!msg.header) {
                 rej(new Error("Missing message header"));
                 return;
+            }
+
+            if (this._connectionState > CONN_CONNECTED){
+                rej(new Error("Not connected"));
             }
 
             this._jobQueue.push({
