@@ -24,6 +24,7 @@
 const S7Parser = require('./s7protocol/s7parser.js');
 const S7Serializer = require('./s7protocol/s7serializer.js');
 const S7Connection = require('./s7connection.js');
+const S7Endpoint = require('./s7endpoint.js');
 const s7constants = require('./constants.json');
 const NodeS7 = require('../nodeS7.js');
 
@@ -31,6 +32,7 @@ module.exports = {
     S7Parser,
     S7Serializer,
     S7Connection,
+    S7Endpoint,
     s7constants,
     NodeS7
 };
