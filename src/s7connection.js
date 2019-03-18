@@ -49,6 +49,7 @@ class S7Connection extends EventEmitter {
      * @param {object} [opts] configuration options
      * @param {number} [opts.maxJobs] the max number of parallel jobs
      * @param {number} [opts.maxPDUSize] the max PDU Size
+     * @param {number} [opts.timeout=2000] the timeout for execution of requests. 0 for no timeout
      */
     constructor(stream, opts) {
         debug('new S7Connection');
@@ -64,6 +65,7 @@ class S7Connection extends EventEmitter {
         opts = opts || {};
         this.maxJobs = opts.maxJobs || 8;
         this.maxPDUSize = opts.maxPDUSize || 960;
+        this.timeout = opts.timeout !== undefined && !isNaN(opts.timeout) ? opts.timeout : 2000;
 
         this._parser = new S7Parser();
         this._serializer = new S7serializer();
@@ -127,13 +129,18 @@ class S7Connection extends EventEmitter {
         let job = this._jobInProcess.get(pdu);
         this._jobInProcess.delete(pdu);
 
+        // clear request timeout timer
+        if (job) {
+            clearTimeout(job.timer);
+        }
+
         // send next telegrams if any job in the queue
         this._processQueue();
 
         // check for errors
         if (data.header.errorClass || data.header.errorCode) {
             let errCode = (data.header.errorClass << 8) | data.header.errorCode
-            let errDesc = constants.errorCodeDesc[errCode] || `<Unknown error code>`;
+            let errDesc = constants.proto.errorCodeDesc[errCode] || `<Unknown error code>`;
             let err = new Error(`PLC error [0x${errCode.toString(16)}]: ${errDesc}`);
 
             if (job) {
@@ -173,6 +180,18 @@ class S7Connection extends EventEmitter {
         this.emit('message', data);
     }
 
+    _onRequestTimeout(pdu) {
+        debug('S7Connection _onRequestTimeout', pdu);
+
+        // find related job
+        let job = this._jobInProcess.get(pdu);
+        this._jobInProcess.delete(pdu);
+
+        job.rej(new Error("Request timeout"));
+
+        this.emit('timeout', job);
+    }
+
     _processQueue() {
         debug('S7Connection _processQueue');
 
@@ -190,6 +209,9 @@ class S7Connection extends EventEmitter {
         }
 
         this._jobInProcess.set(pdu, job);
+        if (this.timeout > 0) {
+            job.timer = setTimeout(() => this._onRequestTimeout(pdu), this.timeout);
+        }
 
         this._serializer.write(job.payload);
 
