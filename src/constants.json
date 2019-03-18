@@ -92,6 +92,16 @@
             "DATA_ERR": 10,
             "DATA_OK": 255
         },
+        "retvalDesc": {
+            "0": "Reserved",
+            "1": "Hardware fault",
+            "3": "Accessing the object not allowed",
+            "5": "Invalid address",
+            "6": "Data type not supported",
+            "7": "Data type inconsistent",
+            "10": "Object does not exist",
+            "255": "Success"
+        },
         "userData": {
             "type": {
                 "REQUEST": 4,
