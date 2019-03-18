@@ -56,7 +56,7 @@ function serializeDataItems(buf, items, ptr) {
         buf.writeUInt8(elm.returnCode || 0, ptr++); //varSpec
         buf.writeUInt8(elm.transportSize, ptr++);
         let dataLength = elm.data.length;
-        if (elm.transportSize === constants.proto.dataTransport.BBIT ||
+        if (//elm.transportSize === constants.proto.dataTransport.BBIT ||
             elm.transportSize === constants.proto.dataTransport.BBYTE ||
             elm.transportSize === constants.proto.dataTransport.BINT) {
             //the length is in bits for these transports
