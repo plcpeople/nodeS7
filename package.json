@@ -21,7 +21,7 @@
   "main": "src/index.js",
   "scripts": {
     "test": "nyc --reporter=html --reporter=text --reporter=text-summary mocha --timeout=3000 test/**/**.spec.js",
-    "doc": "jsdoc -d doc/jsdoc/ -r -R README.md src/"
+    "doc": "jsdoc -d doc/jsdoc/ -c doc/jsdoc.json -r -R README.md src/"
   },
   "engine": "node 4.4.x",
   "license": "MIT",
