@@ -198,8 +198,9 @@ class S7Parser extends Transform {
         obj.head = chunk.readUIntBE(offset, 3);
         offset += 3;
         let paramLength = chunk.readUInt8(offset);
-        //skip one more unknown byte
-        offset += 2;
+        offset += 1;
+        obj.method = chunk.readUInt8(offset);
+        offset += 1;
         let type_function = chunk.readUInt8(offset);
         offset += 1;
         obj.type = type_function >> 4;
@@ -220,6 +221,7 @@ class S7Parser extends Transform {
         //some helpers
         obj.isRequest = obj.type === constants.proto.userData.type.REQUEST;
         obj.isResponse = obj.type === constants.proto.userData.type.RESPONSE;
+        obj.isPush = obj.type === constants.proto.userData.type.PUSH;
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
@@ -350,16 +352,11 @@ class S7Parser extends Transform {
         let len = chunk.readUInt16BE(offset);
         offset += 2;
 
-        //TODO - correctly parse the data
-        //for now, export the buffer
+        /* A message may span multiple requests. So a probably better 
+        way to handle it is keep it as a binary payload here, and to
+        have another upper layer that keeps track of all parts */
         obj.payload = chunk.slice(offset, offset + len);
         offset += len;
-
-        /*
-        switch (param.function) {
-            default:
-                return new Error(`Don't know how to parse the data section of response function [${obj.function}]`);
-        }//*/
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
