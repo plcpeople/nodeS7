@@ -104,6 +104,7 @@
         },
         "userData": {
             "type": {
+                "PUSH": 0,
                 "REQUEST": 4,
                 "RESPONSE": 8
             },
