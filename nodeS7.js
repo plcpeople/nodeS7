@@ -1117,6 +1117,15 @@ NodeS7.prototype.onResponse = function(theData) {
 
 	// NOT SO FAST - can't do this here.  If we time out, then later get the reply, we can't decrement this twice.  Or the CPU will not like us.  Do it if not rcvd.  self.parallelJobsNow--;
 
+	// hotfix for #78, prevents RangeErrors for undersized packets
+	if (!(theData && theData.length > 6)) {
+		outputLog('INVALID READ RESPONSE - DISCONNECTING');
+		outputLog("The incoming packet doesn't have the required minimum length of 7 bytes");
+		outputLog(theData);
+		self.connectionReset();
+		return;
+	}
+
 	var data=checkRFCData(theData);
 
 	if(data==="fastACK"){
