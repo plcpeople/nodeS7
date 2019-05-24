@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/plcpeople/nodeS7"
+    "url": "https://github.com/plcpeople/nodes7"
   },
   "main": "nodeS7.js",
   "engine": "node 4.4.x",
