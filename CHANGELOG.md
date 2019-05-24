@@ -1,3 +1,7 @@
+Version: 0.3.3
+------------
+- Hotfix to prevent crash from LOGO PLC sending split packet (thanks to gfcittolin)
+
 Version: 0.3.2
 ------------
 - Fix bug related to bit array length (thanks to luisbardalez)
