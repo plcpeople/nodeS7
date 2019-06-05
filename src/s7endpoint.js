@@ -403,6 +403,13 @@ class S7Endpoint extends EventEmitter {
         return this._connectionState === CONN_CONNECTED;
     }
 
+    /**
+     * The currently negotiated pdu size
+     */
+    get pduSize() {
+        return this._pduSize;
+    }
+
 
     /**
      * Reads multiple values from multiple PLC areas. Care must be
