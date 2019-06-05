@@ -35,7 +35,7 @@ const constants = require('../constants.json');
  * Match 4: Bit address / Array length
  * Match 5: Array length (for fields that need bit address)
  */
-const REGEX_NODES7_ADDR = /^(?:DB([0-9])+,)?([A-Z]+)([0-9]+)(?:.([0-9]+))?(?:.([0-9]+))?$/;
+const REGEX_NODES7_ADDR = /^(?:DB(\d+),)?([A-Z]+)(\d+)(?:.(\d+))?(?:.(\d+))?$/;
 
 /**
  * 
@@ -48,6 +48,8 @@ function parse(address) {
     if (!match) {
         throw new Error("Couldn't parse item address, invalid format");
     }
+
+    debug("S7Item parseAddress_NodeS7 match", match);
 
     // variables for the fields extracted from the address string
     let match_db = match[1];
