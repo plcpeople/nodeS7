@@ -310,6 +310,12 @@ NodeS7.prototype.onISOConnectReply = function(data) {
 
 	clearTimeout(self.connectTimeout);
 
+	// ignore if we're not expecting it - prevents write after end exception as of #80
+	if (self.isoConnectionState != 2) { 
+		outputLog('Ignoring ISO connect reply, expecting isoConnectionState of 2, is currently ' + self.isoConnectionState, 0, self.connectionID);
+		return; 
+	}
+
 	// Track the connection state
 	self.isoConnectionState = 3;  // 3 = ISO-ON-TCP connected, Wait for PDU response.
 
