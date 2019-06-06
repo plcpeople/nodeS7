@@ -39,6 +39,7 @@ const CONN_DISCONNECTING = 3;
 /**
  * Represents a S7 PLC, handling the connection to it and
  * allowing to call methods that act on it
+ * @emits pdu-size when a change in the negotiated PDU size happens
  */
 class S7Endpoint extends EventEmitter {
 
@@ -342,7 +343,7 @@ class S7Endpoint extends EventEmitter {
         debug("S7Endpoint _onConnectionConnected");
 
         if (this._pduSize != this._connection.pduSize) {
-            //TODO if we have internal optimization states, trigger recalculation here
+            this.emit("pdu-size", this._connection.pduSize);
         }
         this._pduSize = this._connection.pduSize;
 
