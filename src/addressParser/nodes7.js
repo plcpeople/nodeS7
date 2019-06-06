@@ -35,7 +35,7 @@ const constants = require('../constants.json');
  * Match 4: Bit address / Array length
  * Match 5: Array length (for fields that need bit address)
  */
-const REGEX_NODES7_ADDR = /^(?:DB(\d+),)?([A-Z]+)(\d+)(?:.(\d+))?(?:.(\d+))?$/;
+const REGEX_NODES7_ADDR = /^(?:DB(\d+),)?([A-Z]+)(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
 
 /**
  * 
