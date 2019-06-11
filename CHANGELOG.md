@@ -1,3 +1,7 @@
+Version: 0.3.4
+------------
+- Hotfix to prevent crash due to delayed packet (thanks to gfcittolin)
+
 Version: 0.3.3
 ------------
 - Hotfix to prevent crash from LOGO PLC sending split packet (thanks to gfcittolin)
