@@ -434,27 +434,30 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 	}
 
 	self.instantWriteBlockList = []; // Initialize the array.
-
+	instantWriteBlockList = self.instantWriteBlockList
 	if (typeof arg === "string") {
-		self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
-		if (typeof (self.instantWriteBlockList[self.instantWriteBlockList.length - 1]) !== "undefined") {
-			self.instantWriteBlockList[self.instantWriteBlockList.length - 1].writeValue = value;
-		}
-	} else if (Array.isArray(arg) && Array.isArray(value) && (arg.length == value.length)) {
+		// transform into a list
+		arg   = self._transformStringToList(arg)
+		value = self._transformStringToList(value)
+		
+	} 
+	if (Array.isArray(arg) && Array.isArray(value) && (arg.length == value.length)) {
+		
 		for (i = 0; i < arg.length; i++) {
 			if (typeof arg[i] === "string") {
-				self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
-				if (typeof (self.instantWriteBlockList[self.instantWriteBlockList.length - 1]) !== "undefined") {
-					self.instantWriteBlockList[self.instantWriteBlockList.length - 1].writeValue = value[i];
+				instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
+				if (typeof (instantWriteBlockList[instantWriteBlockList.length - 1]) !== "undefined") {
+					instantWriteBlockList[instantWriteBlockList.length - 1].writeValue = value[i];
 				}
 			}
 		}
+		
 	}
 
 	// Validity check.
-	for (i = self.instantWriteBlockList.length - 1; i >= 0; i--) {
-		if (self.instantWriteBlockList[i] === undefined) {
-			self.instantWriteBlockList.splice(i, 1);
+	for (i = instantWriteBlockList.length - 1; i >= 0; i--) {
+		if (instantWriteBlockList[i] === undefined) {
+			instantWriteBlockList.splice(i, 1);
 			outputLog("Dropping an undefined write item.");
 		}
 	}
@@ -487,8 +490,9 @@ NodeS7.prototype.addItemsNow = function(arg) {
 	var self = this, i;
 	outputLog("Adding " + arg, 0, self.connectionID);
 	if (typeof (arg) === "string" && arg !== "_COMMERR") {
-		self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
-	} else if (Array.isArray(arg)) {
+		arg = self._transformStringToList(arg)
+	} 
+	if (Array.isArray(arg)) {
 		for (i = 0; i < arg.length; i++) {
 			if (typeof (arg[i]) === "string" && arg[i] !== "_COMMERR") {
 				self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
@@ -516,19 +520,16 @@ NodeS7.prototype.removeItemsNow = function(arg) {
 	var self = this, i;
 	if (typeof arg === "undefined") {
 		self.polledReadBlockList = [];
-	} else if (typeof arg === "string") {
-		for (i = 0; i < self.polledReadBlockList.length; i++) {
-			outputLog('TCBA ' + self.translationCB(arg));
-			if (self.polledReadBlockList[i].addr === self.translationCB(arg)) {
-				outputLog('Splicing');
-				self.polledReadBlockList.splice(i, 1);
-			}
-		}
-	} else if (Array.isArray(arg)) {
-		for (i = 0; i < self.polledReadBlockList.length; i++) {
-			for (var j = 0; j < arg.length; j++) {
-				if (self.polledReadBlockList[i].addr === self.translationCB(arg[j])) {
-					self.polledReadBlockList.splice(i, 1);
+	} else {
+		if (typeof arg === "string") {
+			arg = self._transformStringToList(arg)
+		} 
+		if (Array.isArray(arg)) {
+			for (i = 0; i < self.polledReadBlockList.length; i++) {
+				for (var j = 0; j < arg.length; j++) {
+					if (self.polledReadBlockList[i].addr === self.translationCB(arg[j])) {
+						self.polledReadBlockList.splice(i, 1);
+					}
 				}
 			}
 		}
@@ -629,12 +630,60 @@ NodeS7.prototype.clearWritePacketTimeouts = function() {
 		self.writePacketArray[i].rcvd = false;
 	}
 }
+NodeS7.prototype._splitLargeBlocks = function(blockList,maxByteRequest,cb=null) {
+	var thisRequest = 0;
+	var requestList = []
 
+	
+
+	for (i = 0; i < blockList.length; i++) {
+		var blockItem = blockList[i]
+		var startByte = blockItem.offset;
+		var remainingLength = blockItem.byteLength;
+		var lengthOffset = 0;
+		
+
+		// Always create a request for a self.globalReadBlockList.
+		requestList[thisRequest] = blockItem.clone();
+		
+		// How many parts?
+		blockItem.parts = Math.ceil(blockItem.byteLength / maxByteRequest);
+		outputLog("BlockList " + i + " parts is " + blockItem.parts + " offset is " + blockItem.offset + " MBR is " + maxByteRequest);
+
+		blockItem.requestReference = [];
+
+		// If we're optimized...
+		for (var j = 0; j < blockItem.parts; j++) {
+			requestList[thisRequest] = blockItem.clone();
+			requestItem = requestList[thisRequest]
+			blockItem.requestReference.push(requestItem);
+			requestItem.offset = startByte;
+			requestItem.byteLength = Math.min(maxByteRequest, remainingLength);
+			requestItem.byteLengthWithFill = requestItem.byteLength;
+			if (requestItem.byteLengthWithFill % 2) { requestItem.byteLengthWithFill += 1; }
+
+			// max
+			//create callback here between requestItem and requestList[thisRequest]
+			if(cb) {
+				lengthOffset = cb(requestItem,blockItem,j,lengthOffset)
+			}
+			if (blockItem.parts > 1) {
+				requestItem.datatype = 'BYTE';
+				requestItem.dtypelen = 1;
+				requestItem.arrayLength = requestItem.byteLength;//self.globalReadBlockList[thisBlock].byteLength;		(This line shouldn't be needed anymore - shouldn't matter)
+			}
+			remainingLength -= maxByteRequest;
+			thisRequest++;
+			startByte += maxByteRequest;
+		}
+	}
+	return requestList
+}
 NodeS7.prototype.prepareWritePacket = function() {
 	var self = this, i;
 	var itemList = self.instantWriteBlockList;
 	var requestList = [];			// The request list consists of the block list, split into chunks readable by PDU.
-	var requestNumber = 0;
+	
 
 	// Sort the items using the sort function, by type and offset.
 	itemList.sort(itemListSorter);
@@ -646,16 +695,16 @@ NodeS7.prototype.prepareWritePacket = function() {
 
 	// Reinitialize the WriteBlockList
 	self.globalWriteBlockList = [];
-
+	blockList = self.globalWriteBlockList;
 	// At this time we do not do write optimizations.
 	// The reason for this is it is would cause numerous issues depending how the code was written in the PLC.
 	// If we write M0.1 and M0.2 then to optimize we would have to write MB0, which also writes 0.0, 0.3, 0.4...
 	//
 	// I suppose when working with integers, if we write MW0 and MW2, we could write these as one block.
 	// But if you really, really want the program to do that, write an array yourself.
-	self.globalWriteBlockList[0] = itemList[0];
-	self.globalWriteBlockList[0].itemReference = [];
-	self.globalWriteBlockList[0].itemReference.push(itemList[0]);
+	blockList[0] = itemList[0];
+	blockList[0].itemReference = [];
+	blockList[0].itemReference.push(itemList[0]);
 
 	var thisBlock = 0;
 	itemList[0].block = thisBlock;
@@ -664,55 +713,26 @@ NodeS7.prototype.prepareWritePacket = function() {
 
 	// Just push the items into blocks and figure out the write buffers
 	for (i = 0; i < itemList.length; i++) {
-		self.globalWriteBlockList[i] = itemList[i]; // Remember - by reference.
-		self.globalWriteBlockList[i].isOptimized = false;
-		self.globalWriteBlockList[i].itemReference = [];
-		self.globalWriteBlockList[i].itemReference.push(itemList[i]);
+		blockList[i] = itemList[i]; // Remember - by reference.
+		blockList[i].isOptimized = false;
+		blockList[i].itemReference = [];
+		blockList[i].itemReference.push(itemList[i]);
 		bufferizeS7Item(itemList[i]);
 	}
 
-	var thisRequest = 0;
+	// need to think of a way to make this cleaner
+	additionStep = function(requestItem,blockItem,index,lengthOffset) {
 
-	// Split the blocks into requests, if they're too large.
-	for (i = 0; i < self.globalWriteBlockList.length; i++) {
-		var startByte = self.globalWriteBlockList[i].offset;
-		var remainingLength = self.globalWriteBlockList[i].byteLength;
-		var lengthOffset = 0;
-
-		// Always create a request for a self.globalReadBlockList.
-		requestList[thisRequest] = self.globalWriteBlockList[i].clone();
-
-		// How many parts?
-		self.globalWriteBlockList[i].parts = Math.ceil(self.globalWriteBlockList[i].byteLength / maxByteRequest);
-		//		outputLog("self.globalWriteBlockList " + i + " parts is " + self.globalWriteBlockList[i].parts + " offset is " + self.globalWriteBlockList[i].offset + " MBR is " + maxByteRequest);
-
-		self.globalWriteBlockList[i].requestReference = [];
-
-		// If we're optimized...
-		for (var j = 0; j < self.globalWriteBlockList[i].parts; j++) {
-			requestList[thisRequest] = self.globalWriteBlockList[i].clone();
-			self.globalWriteBlockList[i].requestReference.push(requestList[thisRequest]);
-			requestList[thisRequest].offset = startByte;
-			requestList[thisRequest].byteLength = Math.min(maxByteRequest, remainingLength);
-			requestList[thisRequest].byteLengthWithFill = requestList[thisRequest].byteLength;
-			if (requestList[thisRequest].byteLengthWithFill % 2) { requestList[thisRequest].byteLengthWithFill += 1; }
-
-			// max
-
-			requestList[thisRequest].writeBuffer = self.globalWriteBlockList[i].writeBuffer.slice(lengthOffset, lengthOffset + requestList[thisRequest].byteLengthWithFill);
-			requestList[thisRequest].writeQualityBuffer = self.globalWriteBlockList[i].writeQualityBuffer.slice(lengthOffset, lengthOffset + requestList[thisRequest].byteLengthWithFill);
-			lengthOffset += self.globalWriteBlockList[i].requestReference[j].byteLength;
-
-			if (self.globalWriteBlockList[i].parts > 1) {
-				requestList[thisRequest].datatype = 'BYTE';
-				requestList[thisRequest].dtypelen = 1;
-				requestList[thisRequest].arrayLength = requestList[thisRequest].byteLength;//self.globalReadBlockList[thisBlock].byteLength;		(This line shouldn't be needed anymore - shouldn't matter)
-			}
-			remainingLength -= maxByteRequest;
-			thisRequest++;
-			startByte += maxByteRequest;
-		}
+		requestItem.writeBuffer = blockItem.writeBuffer.slice(lengthOffset, lengthOffset + requestItem.byteLengthWithFill);
+		requestItem.writeQualityBuffer = blockItem.writeQualityBuffer.slice(lengthOffset, lengthOffset + requestItem.byteLengthWithFill);
+		lengthOffset += blockItem.requestReference[index].byteLength;
+		outputLog("requestItem.writeBuffer",requestItem.writeBuffer)
+		outputLog("requestItem.writeQualityBuffer",requestItem.writeBuffer)
+		outputLog("lengthOffset",lengthOffset	)
+		return lengthOffset
 	}
+	// Split the blocks into requests, if they're too large.
+	requestList = self._splitLargeBlocks(blockList,maxByteRequest,additionStep)
 
 	self.clearWritePacketTimeouts();
 	self.writePacketArray = [];
@@ -723,6 +743,7 @@ NodeS7.prototype.prepareWritePacket = function() {
 	// Before we initialize the self.writePacketArray, we need to loop through all of them and clear timeouts.
 
 	// The packetizer...
+	var requestNumber = 0;
 	while (requestNumber < requestList.length) {
 		// Set up the read packet
 		// Yes this is the same master sequence number shared with the read queue
@@ -731,13 +752,11 @@ NodeS7.prototype.prepareWritePacket = function() {
 			self.masterSequenceNumber = 1;
 		}
 
-		var numItems = 0;
+		
 
 		// Maybe this shouldn't really be here?
 		self.writeReqHeader.copy(self.writeReq, 0);
 
-		// Packet's length
-		var packetWriteLength = 10 + 4;  // 10 byte header and 4 byte param header
 
 		self.writePacketArray.push(new S7Packet());
 		var thisPacketNumber = self.writePacketArray.length - 1;
@@ -745,6 +764,9 @@ NodeS7.prototype.prepareWritePacket = function() {
 		//		outputLog("Write Sequence Number is " + self.writePacketArray[thisPacketNumber].seqNum);
 
 		self.writePacketArray[thisPacketNumber].itemList = [];  // Initialize as array.
+		var numItems = 0;
+		// Packet's length
+		var packetWriteLength = 10 + 4;  // 10 byte header and 4 byte param header
 
 		for (i = requestNumber; i < requestList.length; i++) {
 			//outputLog("Number is " + (requestList[i].byteLengthWithFill + 4 + packetReplyLength));
@@ -801,11 +823,12 @@ NodeS7.prototype.prepareReadPacket = function() {
 	}
 
 	self.globalReadBlockList = [];
+	blockList = self.globalReadBlockList;
 
 	// ...because you have to start your optimization somewhere.
-	self.globalReadBlockList[0] = itemList[0];
-	self.globalReadBlockList[0].itemReference = [];
-	self.globalReadBlockList[0].itemReference.push(itemList[0]);
+	blockList[0] = itemList[0];
+	blockList[0].itemReference = [];
+	blockList[0].itemReference.push(itemList[0]);
 
 	var thisBlock = 0;
 	itemList[0].block = thisBlock;
@@ -814,33 +837,33 @@ NodeS7.prototype.prepareReadPacket = function() {
 	// Optimize the items into blocks
 	for (i = 1; i < itemList.length; i++) {
 		// Skip T, C, P types
-		if ((itemList[i].areaS7Code !== self.globalReadBlockList[thisBlock].areaS7Code) ||   	// Can't optimize between areas
-			(itemList[i].dbNumber !== self.globalReadBlockList[thisBlock].dbNumber) ||			// Can't optimize across DBs
+		if ((itemList[i].areaS7Code !== blockList[thisBlock].areaS7Code) ||   	// Can't optimize between areas
+			(itemList[i].dbNumber !== blockList[thisBlock].dbNumber) ||			// Can't optimize across DBs
 			(!self.isOptimizableArea(itemList[i].areaS7Code)) || 					// Can't optimize T,C (I don't think) and definitely not P.
-			((itemList[i].offset - self.globalReadBlockList[thisBlock].offset + itemList[i].byteLength) > maxByteRequest) ||      	// If this request puts us over our max byte length, create a new block for consistency reasons.
-			(itemList[i].offset - (self.globalReadBlockList[thisBlock].offset + self.globalReadBlockList[thisBlock].byteLength) > self.maxGap)) {		// If our gap is large, create a new block.
+			((itemList[i].offset - blockList[thisBlock].offset + itemList[i].byteLength) > maxByteRequest) ||      	// If this request puts us over our max byte length, create a new block for consistency reasons.
+			(itemList[i].offset - (blockList[thisBlock].offset + blockList[thisBlock].byteLength) > self.maxGap)) {		// If our gap is large, create a new block.
 
 			outputLog("Skipping optimization of item " + itemList[i].addr, 0, self.connectionID);
 
 			// At this point we give up and create a new block.
 			thisBlock = thisBlock + 1;
-			self.globalReadBlockList[thisBlock] = itemList[i]; // By reference.
+			blockList[thisBlock] = itemList[i]; // By reference.
 			//				itemList[i].block = thisBlock; // Don't need to do this.
-			self.globalReadBlockList[thisBlock].isOptimized = false;
-			self.globalReadBlockList[thisBlock].itemReference = [];
-			self.globalReadBlockList[thisBlock].itemReference.push(itemList[i]);
+			blockList[thisBlock].isOptimized = false;
+			blockList[thisBlock].itemReference = [];
+			blockList[thisBlock].itemReference.push(itemList[i]);
 		} else {
-			outputLog("Attempting optimization of item " + itemList[i].addr + " with " + self.globalReadBlockList[thisBlock].addr, 0, self.connectionID);
+			outputLog("Attempting optimization of item " + itemList[i].addr + " with " + blockList[thisBlock].addr, 0, self.connectionID);
 			// This next line checks the maximum.
 			// Think of this situation - we have a large request of 40 bytes starting at byte 10.
 			//	Then someone else wants one byte starting at byte 12.  The block length doesn't change.
 			//
 			// But if we had 40 bytes starting at byte 10 (which gives us byte 10-49) and we want byte 50, our byte length is 50-10 + 1 = 41.
-			self.globalReadBlockList[thisBlock].byteLength = Math.max(self.globalReadBlockList[thisBlock].byteLength, itemList[i].offset - self.globalReadBlockList[thisBlock].offset + itemList[i].byteLength);
+			blockList[thisBlock].byteLength = Math.max(blockList[thisBlock].byteLength, itemList[i].offset - blockList[thisBlock].offset + itemList[i].byteLength);
 
 			// Point the buffers (byte and quality) to a sliced version of the optimized block.  This is by reference (same area of memory)
-			itemList[i].byteBuffer = self.globalReadBlockList[thisBlock].byteBuffer.slice(itemList[i].offset - self.globalReadBlockList[thisBlock].offset, itemList[i].offset - self.globalReadBlockList[thisBlock].offset + itemList[i].byteLength);
-			itemList[i].qualityBuffer = self.globalReadBlockList[thisBlock].qualityBuffer.slice(itemList[i].offset - self.globalReadBlockList[thisBlock].offset, itemList[i].offset - self.globalReadBlockList[thisBlock].offset + itemList[i].byteLength);
+			itemList[i].byteBuffer = blockList[thisBlock].byteBuffer.slice(itemList[i].offset - blockList[thisBlock].offset, itemList[i].offset - blockList[thisBlock].offset + itemList[i].byteLength);
+			itemList[i].qualityBuffer = blockList[thisBlock].qualityBuffer.slice(itemList[i].offset - blockList[thisBlock].offset, itemList[i].offset - blockList[thisBlock].offset + itemList[i].byteLength);
 
 			// For now, change the request type here, and fill in some other things.
 
@@ -849,59 +872,28 @@ NodeS7.prototype.prepareReadPacket = function() {
 			// Since self.globalReadBlockList[thisBlock] exists already at this point, and our buffer is already set, let's not do this now.
 			// self.globalReadBlockList[thisBlock].datatype = 'BYTE';
 			// self.globalReadBlockList[thisBlock].dtypelen = 1;
-			self.globalReadBlockList[thisBlock].isOptimized = true;
-			self.globalReadBlockList[thisBlock].itemReference.push(itemList[i]);
+			blockList[thisBlock].isOptimized = true;
+			blockList[thisBlock].itemReference.push(itemList[i]);
 		}
 	}
 
-	var thisRequest = 0;
+	
 
 	//	outputLog("Preparing the read packet...");
 
 	// Split the blocks into requests, if they're too large.
-	for (i = 0; i < self.globalReadBlockList.length; i++) {
-		// Always create a request for a self.globalReadBlockList.
-		requestList[thisRequest] = self.globalReadBlockList[i].clone();
-
-		// How many parts?
-		self.globalReadBlockList[i].parts = Math.ceil(self.globalReadBlockList[i].byteLength / maxByteRequest);
-		outputLog("self.globalReadBlockList " + i + " parts is " + self.globalReadBlockList[i].parts + " offset is " + self.globalReadBlockList[i].offset + " MBR is " + maxByteRequest, 1, self.connectionID);
-		var startByte = self.globalReadBlockList[i].offset;
-		var remainingLength = self.globalReadBlockList[i].byteLength;
-
-		self.globalReadBlockList[i].requestReference = [];
-
-		// If we're optimized...
-		for (var j = 0; j < self.globalReadBlockList[i].parts; j++) {
-			requestList[thisRequest] = self.globalReadBlockList[i].clone();
-			self.globalReadBlockList[i].requestReference.push(requestList[thisRequest]);
-			//outputLog(self.globalReadBlockList[i]);
-			//outputLog(self.globalReadBlockList.slice(i,i+1));
-			requestList[thisRequest].offset = startByte;
-			requestList[thisRequest].byteLength = Math.min(maxByteRequest, remainingLength);
-			requestList[thisRequest].byteLengthWithFill = requestList[thisRequest].byteLength;
-			if (requestList[thisRequest].byteLengthWithFill % 2) { requestList[thisRequest].byteLengthWithFill += 1; }
-			// Just for now...
-			if (self.globalReadBlockList[i].parts > 1) {
-				requestList[thisRequest].datatype = 'BYTE';
-				requestList[thisRequest].dtypelen = 1;
-				requestList[thisRequest].arrayLength = requestList[thisRequest].byteLength;//self.globalReadBlockList[thisBlock].byteLength;
-			}
-			remainingLength -= maxByteRequest;
-			thisRequest++;
-			startByte += maxByteRequest;
-		}
-	}
+	requestList = self._splitLargeBlocks(blockList,maxByteRequest)
 
 	//requestList[5].offset = 243;
 	//	requestList = self.globalReadBlockList;
 
 	// The packetizer...
-	var requestNumber = 0;
+	
 
 	self.clearReadPacketTimeouts();
 	self.readPacketArray = [];
 
+	var requestNumber = 0;
 	while (requestNumber < requestList.length) {
 		// Set up the read packet
 		self.masterSequenceNumber += 1;
@@ -1353,22 +1345,25 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 		// Loop through the global block list...
 		for (i = 0; i < self.globalReadBlockList.length; i++) {
 			var lengthOffset = 0;
+			globalReadBlock = self.globalReadBlockList[i]
 			// For each block, we loop through all the requests.  Remember, for all but large arrays, there will only be one.
-			for (var j = 0; j < self.globalReadBlockList[i].requestReference.length; j++) {
+			for (var j = 0; j < globalReadBlock.requestReference.length; j++) {
 				// Now that our request is complete, we reassemble the BLOCK byte buffer as a copy of each and every request byte buffer.
-				self.globalReadBlockList[i].requestReference[j].byteBuffer.copy(self.globalReadBlockList[i].byteBuffer, lengthOffset, 0, self.globalReadBlockList[i].requestReference[j].byteLength);
-				self.globalReadBlockList[i].requestReference[j].qualityBuffer.copy(self.globalReadBlockList[i].qualityBuffer, lengthOffset, 0, self.globalReadBlockList[i].requestReference[j].byteLength);
-				lengthOffset += self.globalReadBlockList[i].requestReference[j].byteLength;
+				requestReferenceItem = globalReadBlock.requestReference[j]
+				requestReferenceItem.byteBuffer.copy(globalReadBlock.byteBuffer, lengthOffset, 0, requestReferenceItem.byteLength);
+				requestReferenceItem.qualityBuffer.copy(globalReadBlock.qualityBuffer, lengthOffset, 0, requestReferenceItem.byteLength);
+				lengthOffset += requestReferenceItem.byteLength;
 			}
 			// For each ITEM reference pointed to by the block, we process the item.
-			for (var k = 0; k < self.globalReadBlockList[i].itemReference.length; k++) {
-				processS7ReadItem(self.globalReadBlockList[i].itemReference[k]);
-				outputLog('Address ' + self.globalReadBlockList[i].itemReference[k].addr + ' has value ' + self.globalReadBlockList[i].itemReference[k].value + ' and quality ' + self.globalReadBlockList[i].itemReference[k].quality, 1, self.connectionID);
-				if (!isQualityOK(self.globalReadBlockList[i].itemReference[k].quality)) {
+			for (var k = 0; k < globalReadBlock.itemReference.length; k++) {
+				itemReferenceItem = globalReadBlock.itemReference[k]
+				processS7ReadItem(itemReferenceItem);
+				outputLog('Address ' + itemReferenceItem.addr + ' has value ' + itemReferenceItem.value + ' and quality ' + itemReferenceItem.quality, 1, self.connectionID);
+				if (!isQualityOK(itemReferenceItem.quality)) {
 					anyBadQualities = true;
-					dataObject[self.globalReadBlockList[i].itemReference[k].useraddr] = self.globalReadBlockList[i].itemReference[k].quality;
+					dataObject[itemReferenceItem.useraddr] = itemReferenceItem.quality;
 				} else {
-					dataObject[self.globalReadBlockList[i].itemReference[k].useraddr] = self.globalReadBlockList[i].itemReference[k].value;
+					dataObject[itemReferenceItem.useraddr] = itemReferenceItem.value;
 				}
 			}
 		}
@@ -1479,6 +1474,14 @@ NodeS7.prototype.connectionCleanup = function() {
 	self.clearWritePacketTimeouts();  // Note this clears timeouts.
 }
 
+NodeS7.prototype._transformStringToList = function(arg) {
+	// transform into a list
+	tempArgList = [];
+	tempArgList.push(arg);
+	arg = tempArgList;
+	return arg
+}
+
 /**
  * Internal Functions
  */
@@ -1575,13 +1578,12 @@ function processS7Packet(theData, theItem, thePointer) {
 		return 0;   			// Hard to increment the pointer so we call it a malformed packet and we're done.
 	}
 
-	var reportedDataLength;
-
+	
+	var dataLengthBase = 1;
 	if (theItem.readTransportCode == 0x04) {
-		reportedDataLength = theData.readUInt16BE(thePointer + 2) / 8;  // For different transport codes this may not be right.
-	} else {
-		reportedDataLength = theData.readUInt16BE(thePointer + 2);
-	}
+		var dataLengthBase = 8;  // For different transport codes this may not be right.
+	} 
+	var reportedDataLength = theData.readUInt16BE(thePointer + 2) / dataLengthBase; 
 	var responseCode = theData[thePointer];
 	var transportCode = theData[thePointer + 1];
 
@@ -1707,88 +1709,138 @@ function writePostProcess(theItem) {
 	}
 }
 
+function processS7ReadByDataType(theItem, thePointer) {
+	tempValue = null
+	status = 1
+	switch (theItem.datatype) {
+
+		case "REAL":
+			tempValue = theItem.byteBuffer.readFloatBE(thePointer);
+			break;
+		case "DWORD":
+			tempValue = theItem.byteBuffer.readUInt32BE(thePointer);
+			break;
+		case "DINT":
+			tempValue = theItem.byteBuffer.readInt32BE(thePointer);
+			break;
+		case "INT":
+			tempValue = theItem.byteBuffer.readInt16BE(thePointer);
+			break;
+		case "WORD":
+			tempValue = theItem.byteBuffer.readUInt16BE(thePointer);
+			break;
+		case "X":
+			tempValue = ((theItem.byteBuffer.readUInt8(thePointer) >> (bitShiftAmount)) & 1) ? true : false;
+			break;
+		case "B":
+		case "BYTE":
+			tempValue = theItem.byteBuffer.readUInt8(thePointer);
+			break;
+		case "S":
+		case "STRING":
+			strlen = theItem.byteBuffer.readUInt8(thePointer+1);
+			tempString = '';
+			for (var charOffset = 2; charOffset < theItem.dtypelen && (charOffset - 2) < strlen; charOffset++) {
+				// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
+				// Convert to string.
+				tempString += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer+charOffset));
+			}
+			tempValue = tempString;
+			break;
+		case "C":
+		case "CHAR":
+			// Convert to string.
+			tempValue = String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer));
+			break;
+		case "TIMER":
+		case "COUNTER":
+			tempValue = theItem.byteBuffer.readInt16BE(thePointer);
+			break;
+
+		default:
+			outputLog("Unknown data type in response - should never happen.  Should have been caught earlier.  " + theItem.datatype);
+			status = 0;
+			
+	}
+	return [status,tempValue]
+}
+
+function modifyValue(theAttri, value) {
+	if (theAttri instanceof Array) {
+		theAttri.push(value);
+	} else {
+		theAttri = value
+	}
+	return theAttri
+}
 
 function processS7ReadItem(theItem) {
 
 	var thePointer = 0;
 	var strlen = 0;
 	var tempString = '';
+	theItem.value = '';
+	theItem.quality = '';
+	/*
+	if (!(['C','CHAR'].includes(theItem.datatype)) && theItem.arrayLength > 1) {
+		theItem.value = [];
+		theItem.quality = [];
+	} 
+	var bitShiftAmount = theItem.bitOffset;
+	for (var arrayIndex = 0; arrayIndex < theItem.arrayLength; arrayIndex++) {
+		if (theItem.qualityBuffer[thePointer] !== 0xC0) {
+			theItem.value   = modifyValue(theItem.value,theItem.badValue());
+			theItem.quality = modifyValue(theItem.quality,'BAD ' + theItem.qualityBuffer[thePointer])
+		} else {
+			theItem.quality = modifyValue(theItem.quality,'OK')
 
+			results = processS7ReadByDataType(theItem,thePointer);
+			if (results[0] == 0) { return 0 }
+			tempValue = results[1]
+
+			if (['C','CHAR'].includes(theItem.datatype))  {
+				tempValue = theItem.value + tempValue
+			}
+			theItem.value = modifyValue(theItem.value,tempValue)
+
+		}
+		if (theItem.datatype == 'X' && theItem.arrayLength > 1) {
+			// For bit arrays, we have to do some tricky math to get the pointer to equal the byte offset.
+			// Note that we add the bit offset here for the rare case of an array starting at other than zero.  We either have to
+			// drop support for this at the request level or support it here.
+			bitShiftAmount++;
+			if ((((arrayIndex + theItem.bitOffset + 1) % 8) === 0) || (arrayIndex == theItem.arrayLength - 1)) {
+				thePointer += theItem.dtypelen;
+				bitShiftAmount = 0;
+			}
+		} else {
+			// Add to the pointer every time.
+			thePointer += theItem.dtypelen;
+		}
+	}
+	*/
 	if (theItem.arrayLength > 1) {
-		// Array value.
-		if (theItem.datatype != 'C' && theItem.datatype != 'CHAR') {
+		if (!(['C','CHAR'].includes(theItem.datatype))) {
 			theItem.value = [];
 			theItem.quality = [];
-		} else {
-			theItem.value = '';
-			theItem.quality = '';
-		}
+		} 
 		var bitShiftAmount = theItem.bitOffset;
 		for (var arrayIndex = 0; arrayIndex < theItem.arrayLength; arrayIndex++) {
 			if (theItem.qualityBuffer[thePointer] !== 0xC0) {
-				if (theItem.quality instanceof Array) {
-					theItem.value.push(theItem.badValue());
-					theItem.quality.push('BAD ' + theItem.qualityBuffer[thePointer]);
-				} else {
-					theItem.value = theItem.badValue();
-					theItem.quality = 'BAD ' + theItem.qualityBuffer[thePointer];
-				}
+				theItem.value   = modifyValue(theItem.value,theItem.badValue());
+				theItem.quality = modifyValue(theItem.quality,'BAD ' + theItem.qualityBuffer[thePointer])
 			} else {
-				// If we're a string, quality is not an array.
-				if (theItem.quality instanceof Array) {
-					theItem.quality.push('OK');
-				} else {
-					theItem.quality = 'OK';
-				}
-				switch (theItem.datatype) {
+				theItem.quality = modifyValue(theItem.quality,'OK')
 
-					case "REAL":
-						theItem.value.push(theItem.byteBuffer.readFloatBE(thePointer));
-						break;
-					case "DWORD":
-						theItem.value.push(theItem.byteBuffer.readUInt32BE(thePointer));
-						break;
-					case "DINT":
-						theItem.value.push(theItem.byteBuffer.readInt32BE(thePointer));
-						break;
-					case "INT":
-						theItem.value.push(theItem.byteBuffer.readInt16BE(thePointer));
-						break;
-					case "WORD":
-						theItem.value.push(theItem.byteBuffer.readUInt16BE(thePointer));
-						break;
-					case "X":
-						theItem.value.push(((theItem.byteBuffer.readUInt8(thePointer) >> (bitShiftAmount)) & 1) ? true : false);
-						break;
-					case "B":
-					case "BYTE":
-						theItem.value.push(theItem.byteBuffer.readUInt8(thePointer));
-						break;
-					case "S":
-					case "STRING":
-						strlen = theItem.byteBuffer.readUInt8(thePointer+1);
-						tempString = '';
-						for (var charOffset = 2; charOffset < theItem.dtypelen && (charOffset - 2) < strlen; charOffset++) {
-							// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
-							// Convert to string.
-							tempString += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer+charOffset));
-						}
-						theItem.value.push(tempString);
-						break;
-					case "C":
-					case "CHAR":
-						// Convert to string.
-						theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer));
-						break;
-					case "TIMER":
-					case "COUNTER":
-						theItem.value.push(theItem.byteBuffer.readInt16BE(thePointer));
-						break;
+				results = processS7ReadByDataType(theItem,thePointer);
+				if (results[0] == 0) { return 0 }
+				tempValue = results[1]
 
-					default:
-						outputLog("Unknown data type in response - should never happen.  Should have been caught earlier.  " + theItem.datatype);
-						return 0;
+				if (['C','CHAR'].includes(theItem.datatype))  {
+					tempValue = theItem.value + tempValue
 				}
+				theItem.value = modifyValue(theItem.value,tempValue)
+
 			}
 			if (theItem.datatype == 'X') {
 				// For bit arrays, we have to do some tricky math to get the pointer to equal the byte offset.
@@ -1804,65 +1856,31 @@ function processS7ReadItem(theItem) {
 				thePointer += theItem.dtypelen;
 			}
 		}
+
+	
 	} else {
-		// Single value.
+		
 		if (theItem.qualityBuffer[thePointer] !== 0xC0) {
-			theItem.value = theItem.badValue();
-			theItem.quality = ('BAD ' + theItem.qualityBuffer[thePointer]);
+			theItem.value   = modifyValue(theItem.value,theItem.badValue());
+			theItem.quality = modifyValue(theItem.quality,'BAD ' + theItem.qualityBuffer[thePointer])
 		} else {
-			theItem.quality = ('OK');
-			switch (theItem.datatype) {
+			theItem.quality = modifyValue(theItem.quality,'OK')
 
-				case "REAL":
-					theItem.value = theItem.byteBuffer.readFloatBE(thePointer);
-					break;
-				case "DWORD":
-					theItem.value = theItem.byteBuffer.readUInt32BE(thePointer);
-					break;
-				case "DINT":
-					theItem.value = theItem.byteBuffer.readInt32BE(thePointer);
-					break;
-				case "INT":
-					theItem.value = theItem.byteBuffer.readInt16BE(thePointer);
-					break;
-				case "WORD":
-					theItem.value = theItem.byteBuffer.readUInt16BE(thePointer);
-					break;
-				case "X":
-					theItem.value = (((theItem.byteBuffer.readUInt8(thePointer) >> (theItem.bitOffset)) & 1) ? true : false);
-					break;
-				case "B":
-				case "BYTE":
-					// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
-					theItem.value = theItem.byteBuffer.readUInt8(thePointer);
-					break;
-				case "S":
-				case "STRING":
-					strlen = theItem.byteBuffer.readUInt8(thePointer+1);
-					theItem.value = '';
-					for (var charOffset = 2; charOffset < theItem.dtypelen && (charOffset - 2) < strlen; charOffset++) {
-						// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
-						// Convert to string.
-						theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer+charOffset));
-					}
-					break;
-				case "C":
-				case "CHAR":
-					// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
-					theItem.value = String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer));
-					break;
-				case "TIMER":
-				case "COUNTER":
-					theItem.value = theItem.byteBuffer.readInt16BE(thePointer);
-					break;
-				default:
-					outputLog("Unknown data type in response - should never happen.  Should have been caught earlier.  " + theItem.datatype);
-					return 0;
+			results = processS7ReadByDataType(theItem,thePointer);
+			if (results[0] == 0) { return 0 }
+			tempValue = results[1]
+
+			if (['C','CHAR'].includes(theItem.datatype))  {
+				tempValue = theItem.value + tempValue
 			}
-		}
-		thePointer += theItem.dtypelen;
-	}
+			theItem.value = modifyValue(theItem.value,tempValue)
 
+		}
+		
+		// Add to the pointer every time.
+		thePointer += theItem.dtypelen;
+			
+	}
 	if (((thePointer) % 2)) { // Odd number.  With the S7 protocol we only request an even number of bytes.  So there will be a filler byte.
 		thePointer += 1;
 	}
@@ -1872,22 +1890,23 @@ function processS7ReadItem(theItem) {
 }
 
 function getWriteBuffer(theItem) {
-	var newBuffer;
 
+	var bufferLength = 0;
+	var itemByteLength = 0;
 	// NOTE: It seems that when writing, the data that is sent must have a "fill byte" so that data length is even only for all
 	//  but the last request.  The last request must have no padding.  So we DO NOT add the padding here anymore.
 
 	if (theItem.datatype === 'X' && theItem.arrayLength === 1) {
-		newBuffer = new Buffer(2 + 3); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
-		// Initialize, especially be sure to get last bit which may be a fill bit.
-		newBuffer.fill(0);
-		newBuffer.writeUInt16BE(1, 2); // Might need to do something different for different trans codes
+		bufferLength = 2 + 3; // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
+		itemByteLength = 1; // Might need to do something different for different trans codes
 	} else {
-		newBuffer = new Buffer(theItem.byteLength + 4); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
-		newBuffer.fill(0);
-		newBuffer.writeUInt16BE(theItem.byteLength * 8, 2); // Might need to do something different for different trans codes
+		bufferLength = theItem.byteLength + 4; // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
+		itemByteLength = theItem.byteLength * 8; // Might need to do something different for different trans codes
 	}
-
+	var newBuffer = new Buffer(bufferLength); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
+	// Initialize, especially be sure to get last bit which may be a fill bit.
+	newBuffer.fill(0);
+	newBuffer.writeUInt16BE(itemByteLength, 2); // Might need to do something different for different trans codes
 	if (theItem.writeBuffer.length < theItem.byteLengthWithFill) {
 		outputLog("Attempted to access part of the write buffer that wasn't there when writing an item.");
 	}
@@ -1900,69 +1919,99 @@ function getWriteBuffer(theItem) {
 	return newBuffer;
 }
 
+function processS7WriteByDataType(theItem,writtenValues, thePointer) {
+	tempValue = null
+	status = 1
+	writtenValue   = writtenValues[0]
+	arrayIndex     = writtenValues[1]
+	theByte        = writtenValues[2]
+	bitShiftAmount = writtenValues[3]
+	
+	switch (theItem.datatype) {
+		case "REAL":
+			theItem.writeBuffer.writeFloatBE(writtenValue, thePointer);
+			break;
+		case "DWORD":
+			theItem.writeBuffer.writeInt32BE(writtenValue, thePointer);
+			break;
+		case "DINT":
+			theItem.writeBuffer.writeInt32BE(writtenValue, thePointer);
+			break;
+		case "INT":
+			theItem.writeBuffer.writeInt16BE(writtenValue, thePointer);
+			break;
+		case "WORD":
+			theItem.writeBuffer.writeUInt16BE(writtenValue, thePointer);
+			break;
+		case "X":
+			tempValue = ((writtenValue === true) ? 1 : 0)
+			if (bitShiftAmount) {
+				// enter here when theItem.writeValue  is an array 
+				theByte = theByte | (tempValue << bitShiftAmount);
+				// Maybe not so efficient to do this every time when we only need to do it every 8.  Need to be careful with optimizations here for odd requests.
+				theItem.writeBuffer.writeUInt8(theByte, thePointer);
+				bitShiftAmount++;
+			} else {
+				// enter here when theItem.writeValue is a value
+				theItem.writeBuffer.writeUInt8(tempValue, thePointer);
+			}
+			break;
+		case "B":
+		case "BYTE":
+			theItem.writeBuffer.writeUInt8(writtenValue, thePointer);
+			break;
+		case "C":
+		case "CHAR":
+			// Convert to string.
+			//??					theItem.writeBuffer.writeUInt8(theItem.writeValue.toCharCode(), thePointer);
+			theItem.writeBuffer.writeUInt8(writtenValue.charCodeAt(arrayIndex), thePointer);
+			break;
+		case "S":
+		case "STRING":
+			// Convert to bytes.
+			theItem.writeBuffer.writeUInt8(theItem.dtypelen - 2, thePointer); // Array length is requested val, -2 is string length
+			theItem.writeBuffer.writeUInt8(Math.min(theItem.dtypelen - 2, writtenValue.length), thePointer+1); // Array length is requested val, -2 is string length
+			for (var charOffset = 2; charOffset < theItem.dtypelen; charOffset++) {
+				if (charOffset < (writtenValue.length + 2)) {
+					theItem.writeBuffer.writeUInt8(writtenValue.charCodeAt(charOffset-2), thePointer+charOffset);
+				} else {
+					theItem.writeBuffer.writeUInt8(32, thePointer+charOffset); // write space
+				}
+			}
+			break;
+		case "TIMER":
+		case "COUNTER":
+			// I didn't think we supported arrays of timers and counters.
+			theItem.writeBuffer.writeInt16BE(writtenValue, thePointer);
+			break;
+		default:
+			outputLog("Unknown data type when preparing array write packet - should never happen.  Should have been caught earlier.  " + theItem.datatype);
+			status = 0;
+	}
+	return [status,[tempValue, theByte, bitShiftAmount] ]
+}
+
 function bufferizeS7Item(theItem) {
 	var thePointer, theByte;
 	theByte = 0;
 	thePointer = 0; // After length and header
+	console.log(theItem.arrayLength)
+	console.log(theItem.writeValue.length)
 
 	if (theItem.arrayLength > 1) {
 		// Array value.
 		var bitShiftAmount = theItem.bitOffset;
+
 		for (var arrayIndex = 0; arrayIndex < theItem.arrayLength; arrayIndex++) {
-			switch (theItem.datatype) {
-				case "REAL":
-					theItem.writeBuffer.writeFloatBE(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				case "DWORD":
-					theItem.writeBuffer.writeInt32BE(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				case "DINT":
-					theItem.writeBuffer.writeInt32BE(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				case "INT":
-					theItem.writeBuffer.writeInt16BE(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				case "WORD":
-					theItem.writeBuffer.writeUInt16BE(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				case "X":
-					theByte = theByte | (((theItem.writeValue[arrayIndex] === true) ? 1 : 0) << bitShiftAmount);
-					// Maybe not so efficient to do this every time when we only need to do it every 8.  Need to be careful with optimizations here for odd requests.
-					theItem.writeBuffer.writeUInt8(theByte, thePointer);
-					bitShiftAmount++;
-					break;
-				case "B":
-				case "BYTE":
-					theItem.writeBuffer.writeUInt8(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				case "C":
-				case "CHAR":
-					// Convert to string.
-					//??					theItem.writeBuffer.writeUInt8(theItem.writeValue.toCharCode(), thePointer);
-					theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(arrayIndex), thePointer);
-					break;
-				case "S":
-				case "STRING":
-					// Convert to bytes.
-					theItem.writeBuffer.writeUInt8(theItem.dtypelen - 2, thePointer); // Array length is requested val, -2 is string length
-					theItem.writeBuffer.writeUInt8(Math.min(theItem.dtypelen - 2, theItem.writeValue[arrayIndex].length), thePointer+1); // Array length is requested val, -2 is string length
-					for (var charOffset = 2; charOffset < theItem.dtypelen; charOffset++) {
-						if (charOffset < (theItem.writeValue[arrayIndex].length + 2)) {
-							theItem.writeBuffer.writeUInt8(theItem.writeValue[arrayIndex].charCodeAt(charOffset-2), thePointer+charOffset);
-						} else {
-							theItem.writeBuffer.writeUInt8(32, thePointer+charOffset); // write space
-						}
-					}
-					break;
-				case "TIMER":
-				case "COUNTER":
-					// I didn't think we supported arrays of timers and counters.
-					theItem.writeBuffer.writeInt16BE(theItem.writeValue[arrayIndex], thePointer);
-					break;
-				default:
-					outputLog("Unknown data type when preparing array write packet - should never happen.  Should have been caught earlier.  " + theItem.datatype);
-					return 0;
+			
+			if(!(['C','CHAR'].includes(theItem.datatype))) {
+				tempValue = theItem.writeValue[arrayIndex]
+			} else {
+				tempValue = theItem.writeValue
 			}
+			results = processS7WriteByDataType(theItem, [tempValue, arrayIndex,theByte, bitShiftAmount], thePointer)
+			if (results[0] == 0) { return 0}
+			bitShiftAmount = results[2] 
 			if (theItem.datatype == 'X') {
 				// For bit arrays, we have to do some tricky math to get the pointer to equal the byte offset.
 				// Note that we add the bit offset here for the rare case of an array starting at other than zero.  We either have to
@@ -1980,63 +2029,15 @@ function bufferizeS7Item(theItem) {
 		}
 	} else {
 		// Single value.
-		switch (theItem.datatype) {
-
-			case "REAL":
-				theItem.writeBuffer.writeFloatBE(theItem.writeValue, thePointer);
-				break;
-			case "DWORD":
-				theItem.writeBuffer.writeUInt32BE(theItem.writeValue, thePointer);
-				break;
-			case "DINT":
-				theItem.writeBuffer.writeInt32BE(theItem.writeValue, thePointer);
-				break;
-			case "INT":
-				theItem.writeBuffer.writeInt16BE(theItem.writeValue, thePointer);
-				break;
-			case "WORD":
-				theItem.writeBuffer.writeUInt16BE(theItem.writeValue, thePointer);
-				break;
-			case "X":
-				theItem.writeBuffer.writeUInt8(((theItem.writeValue === true) ? 1 : 0), thePointer);
-				// not here				theItem.writeBuffer[1] = 1; // Set transport code to "BIT" to write a single bit.
-				// not here				theItem.writeBuffer.writeUInt16BE(1, 2); // Write only one bit.
-				break;
-			case "B":
-			case "BYTE":
-				// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
-				theItem.writeBuffer.writeUInt8(theItem.writeValue, thePointer);
-				break;
-			case "C":
-			case "CHAR":
-				// No support as of yet for signed 8 bit.  This isn't that common in Siemens.
-				theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(0), thePointer);
-				break;
-			case "S":
-			case "STRING":
-				// Convert to bytes.
-				theItem.writeBuffer.writeUInt8(theItem.dtypelen - 2, thePointer); // Array length is requested val, -2 is string length
-				theItem.writeBuffer.writeUInt8(Math.min(theItem.dtypelen - 2, theItem.writeValue.length), thePointer+1); // Array length is requested val, -2 is string length
-
-				for (var charOffset = 2; charOffset < theItem.dtypelen; charOffset++) {
-					if (charOffset < (theItem.writeValue.length + 2)) {
-						theItem.writeBuffer.writeUInt8(theItem.writeValue.charCodeAt(charOffset-2), thePointer+charOffset);
-					} else {
-						theItem.writeBuffer.writeUInt8(32, thePointer+charOffset); // write space
-					}
-				}
-				break;
-			case "TIMER":
-			case "COUNTER":
-				theItem.writeBuffer.writeInt16BE(theItem.writeValue, thePointer);
-				break;
-			default:
-				outputLog("Unknown data type in write prepare - should never happen.  Should have been caught earlier.  " + theItem.datatype);
-				return 0;
-		}
+		var tempValue = theItem.writeValue
+		var bitShiftAmount = null // not required in single value
+		results = processS7WriteByDataType(theItem, [tempValue, 0,theByte, bitShiftAmount], thePointer)
+		if (results[0] == 0) { return 0}
+		bitShiftAmount = results[2] 
 		thePointer += theItem.dtypelen;
 	}
 	return undefined;
+	
 }
 
 function stringToS7Addr(addr, useraddr) {
