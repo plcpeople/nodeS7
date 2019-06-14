@@ -105,9 +105,14 @@ class S7ItemGroup extends EventEmitter {
 
         /**
          * Group all items in packets with their parts
+         * 
+         * Iterates all items and try to group them in as few request packets as 
+         * possible, each with as many parts as possible. All this while respecting
+         * the max PDU size for the length of both request and response packets. 
+         * Nearby items are grouped into the same part, reducing overhead.
          */
         for (const item of items) {
-            
+
             let itemComplete = false;
             let itemLength = item.byteLength;
             let itemOffset = item.offset;
@@ -139,7 +144,7 @@ class S7ItemGroup extends EventEmitter {
                         //doesn't fit, just put what we can
                         pktResLength += remainingLength;
                         part.length += remainingLength;
-                        
+
                         // ajust item for the consumed lenth on this part
                         let consumedItemLength = part.length - (itemOffset - part.address);
                         itemOffset += consumedItemLength;
@@ -163,7 +168,7 @@ class S7ItemGroup extends EventEmitter {
 
                     // test if the whole item fits in this part
                     if ((pktResLength + resPartSize + itemLength) <= maxPayloadSize) {
-                        
+
                         partLength = itemLength;
                         itemComplete = true;
                         debug('S7ItemGroup _prepareReadPackets item-new-part complete');
@@ -179,6 +184,7 @@ class S7ItemGroup extends EventEmitter {
 
                     part = {
                         items: [item],
+                        offsets: [],
                         area: item.areaCode,
                         db: item.dbNumber,
                         transport: item.readTransportCode,
@@ -224,6 +230,7 @@ class S7ItemGroup extends EventEmitter {
                     // ... and a new part with the item to it
                     part = {
                         items: [item],
+                        offsets: [],
                         area: item.areaCode,
                         db: item.dbNumber,
                         transport: item.readTransportCode,
@@ -238,7 +245,7 @@ class S7ItemGroup extends EventEmitter {
 
                 // if we still need to address the same item, the current packet is already full,
                 // therefore lets force/optimize creating a new packet
-                if(!itemComplete){
+                if (!itemComplete) {
                     packet = null;
                     part = null;
                 }
@@ -247,7 +254,7 @@ class S7ItemGroup extends EventEmitter {
             lastItem = item;
         }
 
-        // just for debugging purposes
+        // pre-calculating response offsets
         for (let i = 0; i < this._readPackets.length; i++) {
 
             const packet = this._readPackets[i];
@@ -265,6 +272,13 @@ class S7ItemGroup extends EventEmitter {
                 for (let k = 0; k < part.items.length; k++) {
                     const item = part.items[k];
                     debug('S7ItemGroup _prepareReadPackets item #', i, j, k, item._string);
+
+                    let offset = item._getCopyBufferOffsets(part.address, part.length);
+                    if (!offset) {
+                        // if we reach here, we have a problem with our logic there
+                        throw new Error(`Couldn't calculate offsets for item "${item._string}". Please report as a bug`);
+                    }
+                    part.offsets[k] = offset;
                 }
             }
             debug('S7ItemGroup _prepareReadPackets pkt  #', i, lengthReq, lengthRes);
@@ -424,7 +438,7 @@ class S7ItemGroup extends EventEmitter {
         debug("S7ItemGroup readAllItems requestTime", this._lastRequestTime);
 
         // parse response
-        for (let i = 0; i < requests.length; i++) {
+        for (let i = 0; i < this._readPackets.length; i++) {
             const req = this._readPackets[i];
             const res = responses[i];
 
@@ -444,15 +458,18 @@ class S7ItemGroup extends EventEmitter {
                 }
 
                 // good to go, parse response
-                for (const item of reqPart.items) {
-                    item.readValueFromResponse(resPart, reqPart);
+                for (let k = 0; k < reqPart.items.length; k++) {
+                    const item = reqPart.items[k];
+                    const offset = reqPart.offsets[k];
+                    //use our pre-calculated offsets to directly copy the data
+                    item._copyFromBuffer(resPart.data, offset);
                 }
             }
         }
 
         // update values and map items into reult object
         this._items.forEach((item, tag) => {
-            item._updateValueFromBuffer();
+            item.updateValueFromBuffer();
             result[tag] = item.value
         });
 

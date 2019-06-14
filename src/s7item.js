@@ -100,8 +100,58 @@ class S7Item extends EventEmitter {
         return this._props.byteLengthWithFill;
     }
 
-    _updateValueFromBuffer() {
-        debug('S7Item _updateValueFromBuffer', this._dataBuffer);
+    /**
+     * @private
+     * Calculates the buffer offsets to be used in Buffer.copy()
+     * that are the memory area intersection between the memory
+     * area of this item and the given one
+     * 
+     * @param {number} address 
+     * @param {number} length 
+     * @returns an object with targetStart, sourceStart, and sourceEnd, 
+     * or null if the provided addresses doesn't intersect
+     */
+    _getCopyBufferOffsets(address, length) {
+        debug('S7Item _getCopyBufferOffsets', address, length);
+
+        let dataStart = address;
+        let dataEnd = address + length;
+        let itemStart = this._props.offset;
+        let itemEnd = this._props.offset + this._props.byteLength;
+        debug('S7Item _getCopyBufferOffsets positions', dataStart, dataEnd, itemStart, itemEnd);
+
+        if (dataStart > itemEnd || dataEnd < itemStart) {
+            return null
+        }
+
+        let targetStart = Math.max(dataStart, itemStart) - itemStart;
+        let sourceStart = Math.max(dataStart, itemStart) - dataStart;
+        let sourceEnd = Math.min(dataEnd, itemEnd) - dataStart;
+        debug('S7Item _getCopyBufferOffsets result', targetStart, sourceStart, sourceEnd);
+
+        return { targetStart, sourceStart, sourceEnd };
+    }
+
+    /**
+     * @private
+     * Updates the internal buffer with provided data
+     * 
+     * @param {Buffer} buffer the buffer containing the data
+     * @param {object} offsets offsets object, as returned from _getCopyBufferOffsets()
+     * @param {number} offsets.targetStart offset to this item
+     * @param {number} offsets.sourceStart where to start copying from
+     * @param {number} offsets.sourceEnd until where to copy the data
+     */
+    _copyFromBuffer(buffer, offsets) {
+        debug('S7Item _getCopyBufferOffsets', this._string, buffer);
+        buffer.copy(this._dataBuffer, offsets.targetStart, offsets.sourceStart, offsets.sourceEnd);
+    }
+
+    /**
+     * Update the item's value according to the internal buffer data.
+     */
+    updateValueFromBuffer() {
+        debug('S7Item updateValueFromBuffer', this._dataBuffer);
 
         let dataBitOffset = this._props.bitOffset;
         let dataOffset = 0;
@@ -142,6 +192,8 @@ class S7Item extends EventEmitter {
      * @returns an object with properties area, db, transport, address and length
      */
     getReadItemRequest() {
+        // TODO doesn't work for big items, we need to split into multiple
+        // items and return an array instead
         let res = {
             area: this._props.areaCode,
             db: this._props.dbNumber,
@@ -154,15 +206,16 @@ class S7Item extends EventEmitter {
     }
 
     /**
-     * 
-     * @param {*} res 
-     * @param {*} [req] the request used to query the value, defaults to the one from getReadItemRequest()
+     * Updates the item's internal buffer with the supplied request-response pair.
+     * Large items may need multiple requests to read the whole memory area.
+     * @param {*} res the response item returned from the PLC
+     * @param {*} req the request used to query the value
      */
     readValueFromResponse(res, req) {
         debug('S7Item readValueFromResponse', this._string, res);
 
         if (!req) {
-            req = this.getReadItemRequest();
+            throw new Error("Missing request data");
         }
 
         if (!res || !res.data) {
@@ -175,27 +228,11 @@ class S7Item extends EventEmitter {
             throw new Error(`Error returned from request of Area [${res.area}] DB [${res.db}] Addr [${res.address}] Len [${res.length}]: "${errDesc}"`)
         }
 
-        // check the bounds of returned data (whether it can fit our data)
-        debug('S7Item readValueFromResponse offsets', req.address, this._props.offset, this._props.byteLength, res.data.length);
-        
-        let dataStart = req.address;
-        let dataEnd = req.address + res.data.length;
-        let itemStart = this._props.offset;
-        let itemEnd = this._props.offset + this._props.byteLength;
-        debug('S7Item readValueFromResponse positions', dataStart, dataEnd, itemStart, itemEnd);
-        
-        if (dataStart > itemEnd || dataEnd < itemStart) {
-            // this condition means this data packet is not for us, maybe not needed to throw
-            throw new Error("Response address out of bounds");
+        let offsets = this._getCopyBufferOffsets(req.address, res.data.length);
+        if (!offsets) {
+            throw new Error("No matching data for this request");
         }
-
-        //TODO: Maybe check if parameters from request are correct
-
-        let targetStart = Math.max(dataStart, itemStart) - itemStart;
-        let sourceStart = Math.max(dataStart, itemStart) - dataStart;
-        let sourceEnd = Math.min(dataEnd, itemEnd) - dataStart;
-        debug('S7Item readValueFromResponse buffer-copy', targetStart, sourceStart, sourceEnd);
-        res.data.copy(this._dataBuffer, targetStart, sourceStart, sourceEnd);
+        this._copyFromBuffer(res.data, offsets);
     }
 }
 
@@ -207,7 +244,7 @@ class S7Item extends EventEmitter {
  * @param {number} bitOffset the bitOffset for boolean
  * @param {number} length the length for char arrays
  */
-function getValueByDataType(buffer, type, offset, bitOffset, length = 1){
+function getValueByDataType(buffer, type, offset, bitOffset, length = 1) {
     switch (type) {
         case "REAL":
             return buffer.readFloatBE(offset);
