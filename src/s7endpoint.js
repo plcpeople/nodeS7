@@ -433,12 +433,14 @@ class S7Endpoint extends EventEmitter {
 
         let arr = [];
         for (const item of items) {
+            //first 3 bits for bit address is irrelevant for transports other than BIT
+            let bitAddr = item.transport === constants.proto.transport.BIT;
             arr.push({
                 syntax: constants.proto.syntax.S7ANY,
                 area: item.area,
                 db: item.db,
                 transport: item.transport,
-                address: item.address,
+                address: bitAddr ? item.address : item.address << 3,
                 length: item.length
             });
         }
@@ -478,7 +480,7 @@ class S7Endpoint extends EventEmitter {
         for (let ptr = 0; ptr < length; ptr += maxPayload) {
             let item = [{
                 area, db,
-                address: address * 8,
+                address: address,
                 transport: constants.proto.transport.BYTE,
                 length: Math.min(length - ptr, maxPayload)
             }];
