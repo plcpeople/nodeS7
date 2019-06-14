@@ -45,9 +45,12 @@ class S7Item extends EventEmitter {
 
         this._name = name;
         this._address = address;
+        this._value = undefined;
 
         this._props = parseAddress_NodeS7(this._address);
         this._string = `S7Item ${this._name}:[${this._address}]`;
+
+        this._dataBuffer = Buffer.alloc(this._props.byteLength);
     }
 
     get name() {
@@ -56,6 +59,10 @@ class S7Item extends EventEmitter {
     get address() {
         return this._address;
     }
+    get value() {
+        return this._value;
+    }
+
     get addrtype() {
         return this._props.addrtype;
     }
@@ -93,6 +100,42 @@ class S7Item extends EventEmitter {
         return this._props.byteLengthWithFill;
     }
 
+    _updateValueFromBuffer() {
+        debug('S7Item _updateValueFromBuffer', this._dataBuffer);
+
+        let dataBitOffset = this._props.bitOffset;
+        let dataOffset = 0;
+
+        // parse the data
+        if (this._props.datatype === "CHAR") {
+            // we handle an array of chars as a single string
+            this._value = getValueByDataType(this._dataBuffer, this._props.datatype, dataOffset, dataBitOffset, this._props.arrayLength);
+        } else {
+            // for the other types, we return an array of values
+            this._value = []
+            for (let i = 0; i < this._props.arrayLength; i++) {
+                // get the data
+                this._value.push(getValueByDataType(this._dataBuffer, this._props.datatype, dataOffset, dataBitOffset, this._props.arrayLength));
+
+                // increment the offsets for the next item
+                if (this._props.datatype === "X") {
+                    dataBitOffset++;
+                    if (dataBitOffset > 7) {
+                        dataBitOffset = 0;
+                        dataOffset++;
+                    }
+                } else {
+                    dataOffset += this._props.dtypelen;
+                }
+            }
+        }
+
+        // de-encapsulate from the array if it's only one item long
+        if (Array.isArray(this._value) && this._value.length === 1) {
+            this._value = this._value[0];
+        }
+    }
+
 
     /**
      * Return a request item that may be used with readVars
@@ -114,10 +157,9 @@ class S7Item extends EventEmitter {
      * 
      * @param {*} res 
      * @param {*} [req] the request used to query the value, defaults to the one from getReadItemRequest()
-     * @returns the parsed value according to the item
      */
-    getValueFromResponse(res, req) {
-        debug('S7Item getValueFromResponse', this._string, res);
+    readValueFromResponse(res, req) {
+        debug('S7Item readValueFromResponse', this._string, res);
 
         if (!req) {
             req = this.getReadItemRequest();
@@ -134,46 +176,26 @@ class S7Item extends EventEmitter {
         }
 
         // check the bounds of returned data (whether it can fit our data)
-        debug('S7Item getValueFromResponse offsets', req.address, this._props.offset, this._props.byteLength, res.data.length);
-        let dataOffset = this._props.offset - req.address;
-        if (dataOffset < 0 || (dataOffset + this._props.byteLength) > res.data.length) {
+        debug('S7Item readValueFromResponse offsets', req.address, this._props.offset, this._props.byteLength, res.data.length);
+        
+        let dataStart = req.address;
+        let dataEnd = req.address + res.data.length;
+        let itemStart = this._props.offset;
+        let itemEnd = this._props.offset + this._props.byteLength;
+        debug('S7Item readValueFromResponse positions', dataStart, dataEnd, itemStart, itemEnd);
+        
+        if (dataStart > itemEnd || dataEnd < itemStart) {
+            // this condition means this data packet is not for us, maybe not needed to throw
             throw new Error("Response address out of bounds");
         }
-        let dataBitOffset = this._props.bitOffset;
 
         //TODO: Maybe check if parameters from request are correct
 
-        // parse the data
-        let value;
-        if (this._props.datatype === "CHAR") {
-            // we handle an array of chars as a single string
-            value = getValueByDataType(res.data, this._props.datatype, dataOffset, dataBitOffset, this._props.arrayLength);
-        } else {
-            // for the other types, we return an array of values
-            value = []
-            for (let i = 0; i < this._props.arrayLength; i++) {
-                // get the data
-                value.push(getValueByDataType(res.data, this._props.datatype, dataOffset, dataBitOffset, this._props.arrayLength));
-                
-                // increment the offsets for the next item
-                if (this._props.datatype === "X"){
-                    dataBitOffset++;
-                    if (dataBitOffset > 7) {
-                        dataBitOffset = 0;
-                        dataOffset++;
-                    }
-                } else {
-                    dataOffset += this._props.dtypelen;
-                }
-            }
-        }
-
-        // de-encapsulate from the array if it's only one item long
-        if (Array.isArray(value) && value.length === 1){
-            value = value[0];
-        }
-
-        return value;
+        let targetStart = Math.max(dataStart, itemStart) - itemStart;
+        let sourceStart = Math.max(dataStart, itemStart) - dataStart;
+        let sourceEnd = Math.min(dataEnd, itemEnd) - dataStart;
+        debug('S7Item readValueFromResponse buffer-copy', targetStart, sourceStart, sourceEnd);
+        res.data.copy(this._dataBuffer, targetStart, sourceStart, sourceEnd);
     }
 }
 

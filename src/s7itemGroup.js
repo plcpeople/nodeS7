@@ -70,7 +70,7 @@ class S7ItemGroup extends EventEmitter {
 
     _prepareReadPackets() {
         debug('S7ItemGroup _prepareReadPackets');
-        
+
         // we still don't have the pdu size, so abort computation
         if (!this._endpoint.pduSize) {
             debug('S7ItemGroup _prepareReadPackets no-pdu-size');
@@ -95,78 +95,153 @@ class S7ItemGroup extends EventEmitter {
         const resPartSize = 4;
         const maxPayloadSize = this._endpoint.pduSize - 18;
 
-        let packet;
-        let part;
-        let pktReqLength;
-        let pktResLength;
-        let lastItem;
-
         debug('S7ItemGroup _prepareReadPackets maxPayloadSize', maxPayloadSize);
+
+        let packet;         //the current working request packet
+        let part;           //the current working request packet's part 
+        let pktReqLength;   //the current length of the request packet
+        let pktResLength;   //the current length of the response of the packet
+        let lastItem;       //the item processed on the last 
 
         /**
          * Group all items in packets with their parts
          */
         for (const item of items) {
+            
+            let itemComplete = false;
+            let itemLength = item.byteLength;
+            let itemOffset = item.offset;
 
-            /* conditions to add to the same part*/
-            if (packet && part
-                && this._isOptimizable(lastItem, item)
-                && maxPayloadSize >= (pktResLength + (item.offset + item.byteLength - part.address))
-            ) {
-                debug('S7ItemGroup _prepareReadPackets item-group', item._string);
+            while (!itemComplete) {
 
-                // compute the new part length to accomodate the new item
-                let newLength = Math.max(part.length, item.offset - part.address + item.byteLength);
-                pktResLength += newLength - part.length;
-                part.length = newLength;
+                let remainingLength = maxPayloadSize - pktResLength; //what does still fit on the response of the current packet
+                let minRequiredLength = Math.min(itemLength, this._optimizationGap); //the minimum length we need to fit our item (or part of it)
 
-                //add the item to the part
-                part.items.push(item);
+                /* conditions to add to the same part*/
+                if (packet && part
+                    && this._isOptimizable(lastItem, item)
+                    && (pktResLength + (itemOffset + minRequiredLength) - (part.address + part.length) <= maxPayloadSize)
+                ) {
+                    debug('S7ItemGroup _prepareReadPackets optimize', item._string);
 
-                /* conditions to just add a new part to the packet, without creating a new one*/
-            } else if (packet
-                && maxPayloadSize >= (pktReqLength + reqPartSize)
-                && maxPayloadSize >= (pktResLength + resPartSize + item.byteLength)
-            ) {
-                debug('S7ItemGroup _prepareReadPackets item-new-part', item._string);
+                    let addedLength = Math.max(part.length, (itemOffset - part.address) + itemLength) - part.length;
 
-                part = {
-                    items: [item],
-                    area: item.areaCode,
-                    db: item.dbNumber,
-                    transport: item.readTransportCode,
-                    address: item.offset,
-                    length: item.byteLength
-                };
-                packet.push(part);
+                    // test if the whole item fits in this part
+                    if (addedLength <= remainingLength) {
 
-                pktReqLength += reqPartSize;
-                pktResLength += resPartSize + item.byteLength;
+                        // compute the new part length to accomodate the new item
+                        pktResLength += addedLength;
+                        part.length += addedLength;
 
-                /* nothing else we can optimize, create a new packet */
-            } else {
-                debug('S7ItemGroup _prepareReadPackets item-new-packet', item._string);
+                        itemComplete = true;
+                        debug('S7ItemGroup _prepareReadPackets optimize complete');
+                    } else {
+                        //doesn't fit, just put what we can
+                        pktResLength += remainingLength;
+                        part.length += remainingLength;
+                        
+                        // ajust item for the consumed lenth on this part
+                        let consumedItemLength = part.length - (itemOffset - part.address);
+                        itemOffset += consumedItemLength;
+                        itemLength -= consumedItemLength;
 
-                //none of the conditions above met, add a new packet ...
-                packet = [];
-                this._readPackets.push(packet);
+                        debug('S7ItemGroup _prepareReadPackets optimize partial', consumedItemLength);
+                    }
 
-                pktReqLength = reqHeaderSize;
-                pktResLength = resHeaderSize;
+                    //add the item to the part
+                    part.items.push(item);
 
-                // ... and a new part with the item to it
-                part = {
-                    items: [item],
-                    area: item.areaCode,
-                    db: item.dbNumber,
-                    transport: item.readTransportCode,
-                    address: item.offset,
-                    length: item.byteLength
-                };
-                packet.push(part);
+                    /* conditions to just add a new part to the current packet, without creating a new one*/
+                } else if (packet
+                    && (pktReqLength + reqPartSize) <= maxPayloadSize
+                    && (pktResLength + resPartSize + minRequiredLength) <= maxPayloadSize
+                ) {
+                    debug('S7ItemGroup _prepareReadPackets item-new-part', item._string);
 
-                pktReqLength += reqPartSize;
-                pktResLength += resPartSize + item.byteLength;
+                    let partLength;
+                    let partOffset = itemOffset;
+
+                    // test if the whole item fits in this part
+                    if ((pktResLength + resPartSize + itemLength) <= maxPayloadSize) {
+                        
+                        partLength = itemLength;
+                        itemComplete = true;
+                        debug('S7ItemGroup _prepareReadPackets item-new-part complete');
+                    } else {
+                        //doesn't fit, just put what we can
+                        let consumedItemLength = maxPayloadSize - pktResLength - resPartSize;
+                        partLength = consumedItemLength;
+                        itemOffset += consumedItemLength;
+                        itemLength -= consumedItemLength;
+
+                        debug('S7ItemGroup _prepareReadPackets item-new-part partial', consumedItemLength);
+                    }
+
+                    part = {
+                        items: [item],
+                        area: item.areaCode,
+                        db: item.dbNumber,
+                        transport: item.readTransportCode,
+                        address: partOffset,
+                        length: partLength
+                    };
+                    packet.push(part);
+
+                    pktReqLength += reqPartSize;
+                    pktResLength += resPartSize + partLength;
+
+                    /* nothing else we can optimize, create a new packet */
+                } else {
+                    debug('S7ItemGroup _prepareReadPackets item-new-packet', item._string);
+
+                    //none of the conditions above met, add a new packet ...
+                    packet = [];
+                    this._readPackets.push(packet);
+
+                    pktReqLength = reqHeaderSize;
+                    pktResLength = resHeaderSize;
+
+                    let partLength;
+                    let partOffset = itemOffset;
+
+                    // ... test if the whole item fits in this part ...
+                    if ((pktResLength + resPartSize + itemLength) <= maxPayloadSize) {
+
+                        partLength = itemLength;
+                        itemComplete = true;
+
+                        debug('S7ItemGroup _prepareReadPackets item-new-packet complete');
+                    } else {
+                        //doesn't fit, just put what we can
+                        let consumedItemLength = maxPayloadSize - pktResLength - resPartSize;
+                        partLength = consumedItemLength;
+                        itemOffset += consumedItemLength;
+                        itemLength -= consumedItemLength;
+
+                        debug('S7ItemGroup _prepareReadPackets item-new-packet partial', consumedItemLength);
+                    }
+
+                    // ... and a new part with the item to it
+                    part = {
+                        items: [item],
+                        area: item.areaCode,
+                        db: item.dbNumber,
+                        transport: item.readTransportCode,
+                        address: partOffset,
+                        length: partLength
+                    };
+                    packet.push(part);
+
+                    pktReqLength += reqPartSize;
+                    pktResLength += resPartSize + partLength;
+                }
+
+                // if we still need to address the same item, the current packet is already full,
+                // therefore lets force/optimize creating a new packet
+                if(!itemComplete){
+                    packet = null;
+                    part = null;
+                }
             }
 
             lastItem = item;
@@ -225,7 +300,7 @@ class S7ItemGroup extends EventEmitter {
             // same DB number (or both undefined)
             && a.dbNumber === b.dbNumber
             // within our gap factor
-            && (b.offset - a.offset - a.byteLength) < this._optimizationGap;
+            && Math.abs(b.offset - a.offset - a.byteLength) < this._optimizationGap;
         debug('S7ItemGroup _isOptimizable', result);
         return result;
     }
@@ -344,16 +419,16 @@ class S7ItemGroup extends EventEmitter {
         let requests = this._readPackets.map(pkt => this._endpoint.readVars(pkt));
         let responses = await Promise.all(requests);
         this._lastRequestTime = process.hrtime(requestTime);
-        
+
         debug("S7ItemGroup readAllItems responses", responses);
         debug("S7ItemGroup readAllItems requestTime", this._lastRequestTime);
 
         // parse response
-        for (let i = 0; i < requests.length; i++){
+        for (let i = 0; i < requests.length; i++) {
             const req = this._readPackets[i];
             const res = responses[i];
 
-            for(let j = 0; j < req.length; j++){
+            for (let j = 0; j < req.length; j++) {
                 const reqPart = req[j];
                 const resPart = res[j];
 
@@ -370,11 +445,16 @@ class S7ItemGroup extends EventEmitter {
 
                 // good to go, parse response
                 for (const item of reqPart.items) {
-                    const val = item.getValueFromResponse(resPart, reqPart);
-                    result[item.name] = val;
+                    item.readValueFromResponse(resPart, reqPart);
                 }
             }
         }
+
+        // update values and map items into reult object
+        this._items.forEach((item, tag) => {
+            item._updateValueFromBuffer();
+            result[tag] = item.value
+        });
 
         return result;
     }
