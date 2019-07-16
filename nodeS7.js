@@ -1379,7 +1379,7 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 		if (typeof (self.readDoneCallback) === 'function') {
 			self.readDoneCallback(anyBadQualities, dataObject);
 		}
-		if (self.resetPending) {
+		if (self.resetPending || anyBadQualities) {
 			self.resetNow();
 		}
 
