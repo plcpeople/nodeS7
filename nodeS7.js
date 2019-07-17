@@ -230,7 +230,9 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 		clearTimeout(self.reconnectTimer);
 		self.reconnectTimer = setTimeout(function() {
 			outputLog("The scheduled reconnect from packetTimeout, connect type, is happening now", 0, self.connectionID);
-			self.connectNow.apply(self, arguments);
+			if (self.isoConnectionState === 0) {
+				self.connectNow.apply(self, arguments);
+			}
 		}, 2000, self.connectionParams);
 		return undefined;
 	}
@@ -422,7 +424,7 @@ NodeS7.prototype.onPDUReply = function(theData) {
 NodeS7.prototype.writeItems = function(arg, value, cb) {
 	var self = this, i;
 	outputLog("Preparing to WRITE " + arg + " to value " + value, 0, self.connectionID);
-	if (self.isWriting()) {
+	if (self.isWriting() || self.writeInQueue) {
 		outputLog("You must wait until all previous writes have finished before scheduling another. ", 0, self.connectionID);
 		return 1;  // Watch for this in your code - 1 means it hasn't actually entered into the queue.
 	}
@@ -462,7 +464,11 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 	if (!self.isReading()) {
 		self.sendWritePacket();
 	} else {
+		if (self.writeInQueue) {
+			outputLog("Write was already in queue - should be prevented above",1,self.connectionID);
+		}
 		self.writeInQueue = true;
+		outputLog("Adding write to queue");
 	}
 	return 0;
 }
@@ -659,7 +665,8 @@ NodeS7.prototype.prepareWritePacket = function() {
 
 	var thisBlock = 0;
 	itemList[0].block = thisBlock;
-	var maxByteRequest = 4 * Math.floor((self.maxPDU - 18 - 12) / 4);  // Absolutely must not break a real array into two requests.  Maybe we can extend by two bytes when not DINT/REAL/INT.
+	var maxByteRequest = 4 * Math.floor((self.maxPDU - 18 - 12) / 4);  // Absolutely must not break a real array into two requests.  Maybe we can extend by two bytes when not DINT/REAL/INT.  But modified now for LREAL.
+	maxByteRequest = 8 * Math.floor((self.maxPDU - 18 - 12) / 8);
 	//	outputLog("Max Write Length is " + maxByteRequest);
 
 	// Just push the items into blocks and figure out the write buffers
@@ -998,6 +1005,9 @@ NodeS7.prototype.sendReadPacket = function() {
 		outputLog('Sending Read Packet', 1, self.connectionID);
 	}
 
+/* NOTE: We no longer do this here.
+Reconnects are done on the response that we will get from the above packets.
+Reason: We could have some packets waiting for timeout from the PLC, and others coming back instantly.
 	if (flagReconnect) {
 		//		console.log("Asking for callback next tick and my ID is " + self.connectionID);
 		clearTimeout(self.reconnectTimer)
@@ -1007,7 +1017,7 @@ NodeS7.prototype.sendReadPacket = function() {
 			self.connectNow(self.connectionParams);  // We used to do this NOW - not NextTick() as we need to mark isoConnectionState as 1 right now.  Otherwise we queue up LOTS of connects and crash.
 		}, 0);
 	}
-
+*/
 
 }
 
@@ -1074,15 +1084,23 @@ NodeS7.prototype.sendWritePacket = function() {
 			// it would have just after the FOR loop is done.
 			// (The FOR statement will increment it to beyond the array, then exit after the condition fails)
 			// scopePlaceholder works as the array is de-referenced NOW, not "nextTick".
-			var scopePlaceholder = self.writePacketArray[i].seqNum;
-			process.nextTick(function() {
-				self.packetTimeout("write", scopePlaceholder);
-			});
+//dm			var scopePlaceholder = self.writePacketArray[i].seqNum;
+//dm			process.nextTick(function() {
+//dm				self.packetTimeout("write", scopePlaceholder);
+//dm			});
+
+			self.writePacketArray[i].timeout = setTimeout(function () {
+				self.packetTimeout.apply(self, arguments);
+			}, 0, "write", self.writePacketArray[i].seqNum);
+
 			if (self.isoConnectionState === 0) {
 				flagReconnect = true;
 			}
 		}
 	}
+/* NOTE: We no longer do this here.
+Reconnects are done on the response that we will get from the above packets.
+Reason: We could have some packets waiting for timeout from the PLC, and others coming back instantly.	
 	if (flagReconnect) {
 		//		console.log("Asking for callback next tick and my ID is " + self.connectionID);
 		clearTimeout(self.reconnectTimer);
@@ -1091,7 +1109,7 @@ NodeS7.prototype.sendWritePacket = function() {
 			outputLog("The scheduled reconnect from sendWritePacket is happening now", 1, self.connectionID);
 			self.connectNow(self.connectionParams);  // We used to do this NOW - not NextTick() as we need to mark isoConnectionState as 1 right now.  Otherwise we queue up LOTS of connects and crash.
 		}, 0);
-	}
+	}*/
 }
 
 NodeS7.prototype.isOptimizableArea = function(area) {
@@ -1285,10 +1303,22 @@ NodeS7.prototype.writeResponse = function(data, foundSeqNum) {
 			// Post-process the write code and apply the quality.
 			// Loop through the global block list...
 			writePostProcess(self.globalWriteBlockList[i]);
-			outputLog(self.globalWriteBlockList[i].addr + ' write completed with quality ' + self.globalWriteBlockList[i].writeQuality, 1, self.connectionID);
+			for (var k = 0; k < self.globalWriteBlockList[i].itemReference.length; k++) {
+				outputLog(self.globalWriteBlockList[i].itemReference[k].addr + ' write completed with quality ' + self.globalWriteBlockList[i].itemReference[k].writeQuality, 0);
+				if (!isQualityOK(self.globalWriteBlockList[i].itemReference[k].writeQuality)) {
+					anyBadQualities = true;
+				}
+			}
+//			outputLog(self.globalWriteBlockList[i].addr + ' write completed with quality ' + self.globalWriteBlockList[i].writeQuality, 1, self.connectionID);
 			if (!isQualityOK(self.globalWriteBlockList[i].writeQuality)) { anyBadQualities = true; }
 		}
 		self.writeDoneCallback(anyBadQualities);
+		if (self.resetPending) {
+			self.resetNow();
+		}
+		if (self.isoConnectionState === 0) {
+			self.connectNow(self.connectionParams, false);
+		}
 	}
 }
 
@@ -1379,11 +1409,22 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 		if (typeof (self.readDoneCallback) === 'function') {
 			self.readDoneCallback(anyBadQualities, dataObject);
 		}
-		if (self.resetPending) {
-			self.resetNow();
-		}
+// Not as of Feb 2019		if (self.resetPending) {
+// Not as of Feb 2019			self.resetNow();
+// Not as of Feb 2019		}
 
-		if (!self.isReading() && self.writeInQueue) { self.sendWritePacket(); }
+		if (!self.writeInQueue) {
+			if (self.resetPending) {
+				self.resetNow();
+			}
+			if (self.isoConnectionState === 0) {
+				self.connectNow(self.connectionParams, false);
+			}
+		}
+		if (!self.isReading() && self.writeInQueue) {
+			outputlog("SendWritePacket called because write was queued.");
+			self.sendWritePacket();
+		}
 	} else {
 		self.sendReadPacket();
 	}
@@ -1434,10 +1475,10 @@ NodeS7.prototype.connectionReset = function() {
 	self.isoConnectionState = 0;
 	self.resetPending = true;
 	outputLog('ConnectionReset is happening');
-	if (!self.isReading() && typeof (self.resetTimeout) === 'undefined') { // For now - ignore writes.  && !isWriting()) {
+	if (!self.isReading() && !self.isWriting() && !self.writeInQueue && typeof(self.resetTimeout) === 'undefined') { // We can no longer logically ignore writes here
 		self.resetTimeout = setTimeout(function() {
 			self.resetNow.apply(self, arguments);
-		}, 1500);
+		}, 3500);  // Increased to 3500 to prevent problems with packet timeouts
 	}
 	// We wait until read() is called again to re-connect.
 }
@@ -1745,6 +1786,9 @@ function processS7ReadItem(theItem) {
 					case "REAL":
 						theItem.value.push(theItem.byteBuffer.readFloatBE(thePointer));
 						break;
+					case "LREAL":
+						theItem.value.push(theItem.byteBuffer.readDoubleBE(thePointer));
+						break;
 					case "DWORD":
 						theItem.value.push(theItem.byteBuffer.readUInt32BE(thePointer));
 						break;
@@ -1815,6 +1859,9 @@ function processS7ReadItem(theItem) {
 
 				case "REAL":
 					theItem.value = theItem.byteBuffer.readFloatBE(thePointer);
+					break;
+				case "LREAL":
+					theItem.value = theItem.byteBuffer.readDoubleBE(thePointer);
 					break;
 				case "DWORD":
 					theItem.value = theItem.byteBuffer.readUInt32BE(thePointer);
@@ -1913,6 +1960,9 @@ function bufferizeS7Item(theItem) {
 				case "REAL":
 					theItem.writeBuffer.writeFloatBE(theItem.writeValue[arrayIndex], thePointer);
 					break;
+				case "LREAL":
+					theItem.writeBuffer.writeDoubleBE(theItem.writeValue[arrayIndex], thePointer);
+					break;
 				case "DWORD":
 					theItem.writeBuffer.writeInt32BE(theItem.writeValue[arrayIndex], thePointer);
 					break;
@@ -1984,6 +2034,9 @@ function bufferizeS7Item(theItem) {
 
 			case "REAL":
 				theItem.writeBuffer.writeFloatBE(theItem.writeValue, thePointer);
+				break;
+			case "LREAL":
+				theItem.writeBuffer.writeDoubleBE(theItem.writeValue, thePointer);
 				break;
 			case "DWORD":
 				theItem.writeBuffer.writeUInt32BE(theItem.writeValue, thePointer);
@@ -2194,7 +2247,11 @@ function stringToS7Addr(addr, useraddr) {
 				theItem.addrtype = "I";
 				theItem.datatype = "REAL";
 				break;
-
+			case "ILR":
+			case "ELR":
+				theItem.addrtype = "I";
+				theItem.datatype = "LREAL";
+				break;
 /* All styles of standard outputs (in oposit to peripheral outputs) */
 			case "Q":
 			case "A":
@@ -2236,7 +2293,11 @@ function stringToS7Addr(addr, useraddr) {
 				theItem.addrtype = "Q";
 				theItem.datatype = "REAL";
 				break;
-
+			case "QLR":
+			case "ALR":
+				theItem.addrtype = "Q";
+				theItem.datatype = "LREAL";
+				break;
 /* All styles of marker */
 			case "M":
 				theItem.addrtype = "M";
@@ -2270,7 +2331,10 @@ function stringToS7Addr(addr, useraddr) {
 				theItem.addrtype = "M";
 				theItem.datatype = "REAL";
 				break;
-
+			case "MLR":
+				theItem.addrtype = "M";
+				theItem.datatype = "LREAL";
+				break;
 /* Timer */
 			case "T":
 				theItem.addrtype = "T";
@@ -2317,8 +2381,13 @@ function stringToS7Addr(addr, useraddr) {
 	if (theItem.datatype === 'R') {
 		theItem.datatype = 'REAL';
 	}
-
+	if (theItem.datatype === 'LR') {
+		theItem.datatype = 'LREAL';
+	}
 	switch (theItem.datatype) {
+		case "LREAL":
+			theItem.dtypelen = 8;
+			break;
 		case "REAL":
 		case "DWORD":
 		case "DINT":
@@ -2478,6 +2547,7 @@ function S7Item() { // Object
 	this.badValue = function() {
 		switch (this.datatype) {
 			case "REAL":
+			case "LREAL":
 				return 0.0;
 			case "DWORD":
 			case "DINT":

@@ -4,5 +4,6 @@ package.json~
 test*.js
 test*.js~
 npm-debug.log
-
+README.md~
+CHANGELOG.md~
 

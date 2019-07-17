@@ -1,3 +1,8 @@
+Version: 0.3.5
+------------
+- Fixed behavior if a write is requested while an earlier-requested one is in progress.
+- Other improvements to re-establishing connection
+
 Version: 0.3.4
 ------------
 - Hotfix to prevent crash due to delayed packet (thanks to gfcittolin)
