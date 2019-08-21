@@ -102,6 +102,34 @@
             "10": "Object does not exist",
             "255": "Success"
         },
+        "block": {
+            "type": {
+                "OB": 56,
+                "DB": 65,
+                "SDB": 66,
+                "FC": 67,
+                "SFC": 68,
+                "FB": 69,
+                "SFB": 70
+            },
+            "subtype": {
+                "OB": 8,
+                "DB": 10,
+                "SDB": 11,
+                "FC": 12,
+                "SFC": 13,
+                "FB": 14,
+                "SFB": 15
+            },
+            "language": {
+                "AWL": 1,
+                "KOP": 2,
+                "FUP": 3,
+                "SCL": 4,
+                "DB": 5,
+                "GRAPH": 6
+            }
+        },
         "userData": {
             "type": {
                 "PUSH": 0,
