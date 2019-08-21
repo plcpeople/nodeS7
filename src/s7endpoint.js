@@ -425,7 +425,7 @@ class S7Endpoint extends EventEmitter {
      * @param {number} items[].length the number of elements to read (according to transport)
      */
     async readVars(items) {
-        debug('S7Connection readVars', items);
+        debug('S7Endpoint readVars', items);
 
         if (this._connectionState !== CONN_CONNECTED) {
             throw new Error("Not connected");
@@ -466,10 +466,11 @@ class S7Endpoint extends EventEmitter {
      * @param {number} area the code of the area to be read
      * @param {number} address the address where to read from
      * @param {number} length the amount of bytes to read
-     * @param {number} [db] the db number to be read (in case of area is a DB)
+     * @param {number} [db] the db number to be read (in the case area is a DB)
+     * @returns {Promise<Buffer>}
      */
     async readArea(area, address, length, db) {
-        debug('S7Connection readArea', area, address, length, db);
+        debug('S7Endpoint readArea', area, address, length, db);
 
         if (this._connectionState !== CONN_CONNECTED) {
             throw new Error("Not connected");
@@ -488,7 +489,7 @@ class S7Endpoint extends EventEmitter {
         }
 
         return Promise.all(requests).then(results => {
-            debug('S7Connection readArea response', results);
+            debug('S7Endpoint readArea response', results);
 
             let data = [];
             for (const res of results) {
@@ -514,6 +515,7 @@ class S7Endpoint extends EventEmitter {
      * @param {number} db the number of the DB to be read
      * @param {number} address the address where to read from
      * @param {number} length the amount of bytes to read
+     * @returns {Promise<Buffer>}
      */
     async readDB(db, address, length) {
         return await this.readArea(constants.proto.area.DB, address, length, db);
@@ -524,6 +526,7 @@ class S7Endpoint extends EventEmitter {
      *
      * @param {number} address the address where to read from
      * @param {number} length the amount of bytes to read
+     * @returns {Promise<Buffer>}
      */
     async readInputs(address, length) {
         return await this.readArea(constants.proto.area.INPUTS, address, length);
@@ -534,6 +537,7 @@ class S7Endpoint extends EventEmitter {
      *
      * @param {number} address the address where to read from
      * @param {number} length the amount of bytes to read
+     * @returns {Promise<Buffer>}
      */
     async readOutputs(address, length) {
         return await this.readArea(constants.proto.area.OUTPUTS, address, length);
@@ -544,6 +548,7 @@ class S7Endpoint extends EventEmitter {
      *
      * @param {number} address the address where to read from
      * @param {number} length the amount of bytes to read
+     * @returns {Promise<Buffer>}
      */
     async readFlags(address, length) {
         return await this.readArea(constants.proto.area.FLAGS, address, length);
@@ -561,10 +566,10 @@ class S7Endpoint extends EventEmitter {
      * @param {number} items[].address the address where to read from
      * @param {number} items[].length the number of elements to read (according to transport)
      * @param {number} items[].dataTransport the transport length of the written buffer
-     * @param {number} items[].data the transport length of the written buffer
+     * @param {Buffer} items[].data the transport length of the written buffer
      */
     async writeVars(items) {
-        debug('S7Connection writeMultiVars', items);
+        debug('S7Endpoint writeMultiVars', items);
 
         if (this._connectionState !== CONN_CONNECTED) {
             throw new Error("Not connected");
@@ -572,12 +577,15 @@ class S7Endpoint extends EventEmitter {
 
         let param = [], data = [];
         for (const item of items) {
+            //first 3 bits for bit address is irrelevant for transports other than BIT
+            let bitAddr = item.transport === constants.proto.transport.BIT;
+
             param.push({
                 syntax: constants.proto.syntax.S7ANY,
                 area: item.area,
                 db: item.db,
                 transport: item.transport,
-                address: item.address,
+                address: bitAddr ? item.address : item.address << 3,
                 length: item.length
             });
             data.push({
@@ -601,6 +609,100 @@ class S7Endpoint extends EventEmitter {
             return msg.data.items;
         });
 
+    }
+    
+    /**
+     * Writes arbitrary length of data into a memory area of 
+     * the PLC. This method accounts for the negotiated PDU 
+     * size and splits it in multiple requests if necessary
+     * 
+     * @param {number} area the code of the area to be written
+     * @param {number} address the address where to write to
+     * @param {Buffer} data the data to be written
+     * @param {number} [db] the db number to be written (in the case area is a DB)
+     * @returns {Promise<void>}
+     */
+    async writeArea(area, address, data, db) {
+        debug('S7Endpoint writeArea', area, address, data, db);
+
+        if (this._connectionState !== CONN_CONNECTED) {
+            throw new Error("Not connected");
+        }
+
+        let maxPayload = this._pduSize - 28; //protocol overhead
+        let requests = [];
+        let dataLength = data.length;
+        for (let ptr = 0; ptr < dataLength; ptr += maxPayload) {
+            let chunk = data.slice(ptr, Math.min(dataLength - ptr, maxPayload))
+            let item = [{
+                area, db,
+                address: address,
+                transport: constants.proto.transport.BYTE,
+                dataTransport: constants.proto.dataTransport.BBYTE,
+                data: chunk,
+                length: chunk.length
+            }];
+            requests.push(this.writeVars(item));
+        }
+
+        return Promise.all(requests).then(results => {
+            debug('S7Endpoint writeArea response', results);
+
+            for (const res of results) {
+                if (res.length > 1) throw new Error("Illegal item count on PLC response");
+
+                let code = res[0].returnCode;
+                if (code !== constants.proto.retval.DATA_OK) {
+                    let errDescr = constants.proto.retvalDesc[code] || '<Unknown return code>';
+                    throw new Error(`Write error [0x${code.toString(16)}]: ${errDescr}`);
+                }
+            }
+        });
+    }
+
+    /**
+     * Writes data into a DB
+     *
+     * @param {number} db the number of the DB to be written
+     * @param {number} address the address where to write to
+     * @param {Buffer} data the amount of bytes to write
+     * @returns {Promise<void>}
+     */
+    async writeDB(db, address, data) {
+        return await this.writeArea(constants.proto.area.DB, address, data, db);
+    }
+
+    /**
+     * Writes data into the inputs area
+     *
+     * @param {number} address the address where to write to
+     * @param {Buffer} data the amount of bytes to write
+     * @returns {Promise<void>}
+     */
+    async writeInputs(address, data) {
+        return await this.writeArea(constants.proto.area.INPUTS, address, data);
+    }
+
+    /**
+     * Writes data into the outputs area
+     *
+     * @param {number} address the address where to write to
+     * @param {Buffer} data the amount of bytes to write
+     * @returns {Promise<void>}
+     */
+    async writeOutputs(address, data) {
+        return await this.writeArea(constants.proto.area.OUTPUTS, address, data);
+    }
+
+    /**
+     * Writes data into the flags (memory / merker) area
+     *
+     * @param {number} address the address where to write to
+     * @param {Buffer} data the amount of bytes to write
+     * @returns {Promise<void>}
+     */
+    async writeFlags(address, data) {
+        return await this.writeArea(constants.proto.area.FLAGS, address, data);
     }
 
 }
