@@ -251,11 +251,13 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 	if (packetType === "read") {
 		outputLog("READ TIMEOUT on sequence number " + packetSeqNum, 0, self.connectionID);
 		self.readResponse(undefined, self.findReadIndexOfSeqNum(packetSeqNum));
+		self.connectionReset();
 		return undefined;
 	}
 	if (packetType === "write") {
 		outputLog("WRITE TIMEOUT on sequence number " + packetSeqNum, 0, self.connectionID);
 		self.writeResponse(undefined, self.findWriteIndexOfSeqNum(packetSeqNum));
+		self.connectionReset();
 		return undefined;
 	}
 	outputLog("Unknown timeout error.  Nothing was done - this shouldn't happen.");
