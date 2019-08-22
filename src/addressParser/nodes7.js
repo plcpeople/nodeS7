@@ -62,7 +62,7 @@ function parse(address) {
     let addrType, dataType, dataTypeLength, addressOffset,
         bitAddressOffset, arrayLength, dbNumber,
         readTransportCode, writeTransportCode, areaCode, 
-        byteLength, byteLengthWithFill;
+        byteLength, byteLengthWrite, byteLengthWithFill;
 
     /* Parse S7 Address */
 
@@ -303,7 +303,7 @@ function parse(address) {
             throw new Error(`Cannot determine area codes for address "${address}"`);
     }
 
-    if (dataType === 'X' && arrayLength === 1) {
+    if (dataType === 'X') {
         writeTransportCode = constants.proto.dataTransport.BBIT;
     }
 
@@ -314,6 +314,9 @@ function parse(address) {
     } else {
         byteLength = arrayLength * dataTypeLength;
     }
+
+    // for writes, boolen values use a whole byte for each
+    byteLengthWrite = arrayLength * dataTypeLength;
 
     byteLengthWithFill = byteLength;
     byteLengthWithFill += byteLengthWithFill % 2;
@@ -330,6 +333,7 @@ function parse(address) {
         writeTransportCode: writeTransportCode, 
         areaCode: areaCode,
         byteLength: byteLength, 
+        byteLengthWrite: byteLengthWrite,
         byteLengthWithFill: byteLengthWithFill
     };
 
