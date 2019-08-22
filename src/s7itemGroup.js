@@ -362,7 +362,7 @@ class S7ItemGroup extends EventEmitter {
             debug("S7ItemGroup addItems item", tag);
 
             if (typeof tag !== 'string') {
-                throw new Error("Array elements must be all of string type");
+                throw new Error("Tags must be of string type");
             }
 
             let addr = this._translationCallback(tag);
@@ -406,7 +406,104 @@ class S7ItemGroup extends EventEmitter {
     async writeItems(tags, values) {
         debug("S7ItemGroup writeItems", tags, values);
 
-        //TODO!
+        // don't do write optimizations, until we're
+        // very sure on what we're doing
+
+        if (typeof tags === 'string') {
+            tags = [tags];
+        } else if (!Array.isArray(tags)) {
+            throw new Error("Parameter tags must be a string or an array of strings");
+        }
+
+        if (!Array.isArray(values)) {
+            values = [values];
+        }
+
+        if (values.length !== tags.length) {
+            throw new Error("Number of tags must match the number of values");
+        }
+
+        // nothing to write
+        if (!tags.length) return;
+
+        // not connected
+        if (this._endpoint.isConnected) {
+            throw new Error("Not connected");
+        }
+
+        const overheadPerItem = 16;
+        const maxPayloadSize = this._endpoint.pduSize - 12;
+
+        let reqPackets = [];
+        let reqItems = [];
+        let curRequestLength = 0;
+
+        /* create an array of requests */
+        for (let i = 0; i < tags.length; i++) {
+            const tag = tags[i];
+            const value = values[i];
+            
+            if (typeof tag !== 'string') {
+                throw new Error("Tags must be of string type");
+            }
+
+            // find item on our list first, so we don't need to create a new one
+            let item = this._items.get(tag);
+            if(!item){
+                let addr = this._translationCallback(tag);
+                item = new S7Item(tag, addr);
+            }
+
+            let buf = item.getWriteBuffer(value);
+            let reqItemLength = overheadPerItem + buf.length;
+
+            // TODO - maybe we can split an item in multiple write request parts
+            if (reqItemLength > maxPayloadSize) {
+                throw new Error(`Cannot write item with size greater than max payload of [${maxPayloadSize}]`);
+            }
+
+            // create a new request if it doesn't fit in the current one
+            if (curRequestLength + reqItemLength > maxPayloadSize) {
+                reqPackets.push(reqItems);
+                reqItems = [];
+                curRequestLength = 0;
+            }
+
+            curRequestLength += reqItemLength;
+
+            reqItems.push({
+                area: item.areaCode, 
+                db: item.dbNumber,
+                address: (item.offset << 3) + item.bitOffset,
+                transport: item.readTransportCode,
+                dataTransport: item.writeTransportCode,
+                data: buf,
+                length: buf.length
+            });
+        }
+
+        // add last request items
+        reqPackets.push(reqItems);
+
+        debug("S7ItemGroup writeItems requests", reqPackets);
+
+        let requestTime = process.hrtime();
+        let requests = reqPackets.map(pkt => this._endpoint.writeVars(pkt));
+        let responses = await Promise.all(requests);
+        this._lastRequestTime = process.hrtime(requestTime);
+
+        debug("S7ItemGroup writeItems responses", responses);
+        debug("S7ItemGroup writeItems requestTime", this._lastRequestTime);
+
+        for (const resp of responses) {
+            for (const res of resp) {
+                let code = res.returnCode;
+                if (code !== constants.proto.retval.DATA_OK) {
+                    let errDescr = constants.proto.retvalDesc[code] || '<Unknown return code>';
+                    throw new Error(`Write error [0x${code.toString(16)}]: ${errDescr}`);
+                }
+            }
+        }
     }
 
     /**

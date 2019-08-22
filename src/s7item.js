@@ -96,6 +96,9 @@ class S7Item extends EventEmitter {
     get byteLength() {
         return this._props.byteLength;
     }
+    get byteLengthWrite() {
+        return this._props.byteLengthWrite;
+    }
     get byteLengthWithFill() {
         return this._props.byteLengthWithFill;
     }
@@ -186,6 +189,36 @@ class S7Item extends EventEmitter {
         }
     }
 
+    /**
+     * 
+     * @param {*} value array of values
+     */
+    getWriteBuffer(value) {
+        debug('S7Item getWriteBuffer', value);
+
+        let b = Buffer.alloc(this._props.byteLengthWrite);
+
+        if (this._props.datatype === "CHAR") {
+            // we handle an array of chars as a single string
+            bufferWriteByDataType(b, value, this._props.datatype, 0, this._props.arrayLength);
+        } else {
+            if (this._props.arrayLength > 1) {
+                if (!Array.isArray(value) || this._props.arrayLength !== value.length) {
+                    throw new Error(`Expected [${this._props.arrayLength}] values for this item`);
+                }
+
+                let ptr = 0
+                for (let i = 0; i < this._props.arrayLength; i++) {
+                    ptr += this._props.dtypelen;
+                    bufferWriteByDataType(b, value[i], this._props.datatype, ptr, this._props.dtypelen - 2);
+                }
+            } else {
+                bufferWriteByDataType(b, value, this._props.datatype, 0, this._props.dtypelen - 2);
+            }
+        }
+
+        return b;
+    }
 
     /**
      * Return a request item that may be used with readVars
@@ -242,7 +275,7 @@ class S7Item extends EventEmitter {
  * @param {string} type the data type
  * @param {number} offset from where to get the data
  * @param {number} bitOffset the bitOffset for boolean
- * @param {number} length the length for char arrays
+ * @param {number} [length] the length for char arrays
  */
 function getValueByDataType(buffer, type, offset, bitOffset, length = 1) {
     switch (type) {
@@ -270,6 +303,70 @@ function getValueByDataType(buffer, type, offset, bitOffset, length = 1) {
             return buffer.toString('ascii', offset + 2, offset + 2 + len);
         case "X":
             return !!((buffer.readUInt8(offset) >> bitOffset) & 0x01);
+        default:
+            throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
+    }
+}
+
+/**
+ * 
+ * @param {Buffer} buffer the Buffer containing the data
+ * @param {*} data the Buffer containing the data
+ * @param {string} type the data type
+ * @param {number} offset from where to get the data
+ * @param {number} [length] the length for char arrays
+ */
+function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
+
+    // type check
+    switch (type) {
+        case "REAL":
+        case "DWORD":
+        case "DINT":
+        case "TIMER":
+        case "COUNTER":
+        case "INT":
+        case "WORD":
+        case "BYTE":
+            if (typeof data !== 'number') throw new Error(`Data for item of type '${type}' must be a number`);
+            break;
+        case "CHAR":
+        case "STRING":
+            if (typeof data !== 'string') throw new Error(`Data for item of type '${type}' must be a string`);
+            break;
+        case "X":
+            //everything is valid here, JS rules for boolean conversion will apply
+            break;
+        default:
+            throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
+    }
+
+
+    switch (type) {
+        case "REAL":
+            return buffer.writeFloatBE(data, offset);
+        case "DWORD":
+            return buffer.writeUInt32BE(data, offset);
+        case "DINT":
+            return buffer.writeInt32BE(data, offset);
+        case "TIMER":
+        case "COUNTER":
+        case "INT":
+            return buffer.writeInt16BE(data, offset);
+        case "WORD":
+            return buffer.writeUInt16BE(data, offset);
+        case "BYTE":
+            return buffer.writeUInt8(data, offset);
+        case "CHAR":
+            // this is supposed to be a clean buffer, no need to empty it first
+            return buffer.write(data, offset, length, 'ascii');
+        case "STRING":
+            // data[0] is the max length, data[1] is the current length, data[2..] is the string itself
+            buffer.writeUInt8(length, offset);
+            buffer.writeUInt8(Math.min(length, data.length), offset + 1);
+            return buffer.write(data, offset + 2, length, 'ascii') + 2;
+        case "X":
+            return buffer.writeUInt8(data ? 1 : 0, offset);
         default:
             throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
     }
