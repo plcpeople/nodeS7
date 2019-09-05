@@ -427,7 +427,7 @@ class S7ItemGroup extends EventEmitter {
         if (!tags.length) return;
 
         // not connected
-        if (this._endpoint.isConnected) {
+        if (!this._endpoint.isConnected) {
             throw new Error("Not connected");
         }
 
@@ -471,10 +471,11 @@ class S7ItemGroup extends EventEmitter {
 
             curRequestLength += reqItemLength;
 
+            let bitAddr = item.transport === constants.proto.transport.BIT;
             reqItems.push({
                 area: item.areaCode, 
                 db: item.dbNumber,
-                address: (item.offset << 3) + item.bitOffset,
+                address: bitAddr ? (item.offset << 3) + item.bitOffset : item.offset,
                 transport: item.readTransportCode,
                 dataTransport: item.writeTransportCode,
                 data: buf,
