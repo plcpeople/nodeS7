@@ -64,7 +64,7 @@ class NodeS7 {
         this._group.readAllItems().then(data => {
             cb(false, data);
         }).catch(e => {
-            cb(true, {});
+            cb(e, {});
         });
     }
 
@@ -77,7 +77,7 @@ class NodeS7 {
         this._group.writeItems(item, value).then(data => {
             cb(false, data);
         }).catch(e => {
-            cb(true, {});
+            cb(e, {});
         });
 
     }
