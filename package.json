@@ -1,7 +1,7 @@
 {
   "name": "nodes7",
   "description": "Routine to communicate with Siemens S7 PLCs",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "author": {
     "name": "Dana Moffit",
     "email": "nodejsplc@gmail.com"
@@ -18,6 +18,6 @@
     "url": "https://github.com/plcpeople/nodes7"
   },
   "main": "nodeS7.js",
-  "engine": "node 4.4.x",
+  "engine": "node 5.10.x",
   "license": "MIT"
 }

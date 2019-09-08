@@ -1,6 +1,14 @@
+Version: 0.3.7
+------------
+- outputLog spelling correction and connection ID added to some outputLog instances where it was missing
+- LREAL type mentioned in documentation
+- LINT type added but BigInt64 requires Node 12 so hold for now
+- Only reset on packet timeout when connected
+
 Version: 0.3.6
 ------------
 - Reset on packet timeout
+- LREAL type added
 
 Version: 0.3.5
 ------------

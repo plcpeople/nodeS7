@@ -49,7 +49,8 @@ Examples
 			  TEST4: 'DB1,REAL0.20',	// Array of 20 values in DB1
 			  TEST5: 'DB1,REAL4',		// Single real value
 			  TEST6: 'DB1,REAL8',		// Another single real value
-			  TEST7: 'DB1,INT12.2'		// Two integer value array
+			  TEST7: 'DB1,INT12.2',		// Two integer value array
+			  TEST8: 'DB1,LREAL4'		// Single 8-byte real value
 	};
 
 	conn.initiateConnection({port: 102, host: '192.168.0.2', rack: 0, slot: 1}, connected); // slot 2 for 300/400, slot 1 for 1200/1500
@@ -141,6 +142,7 @@ If you use it, `translator` should be a function that takes a string as an argum
 
 #### Examples:
 - MR30 - MD30 as REAL
+- DB10,LR32 - LREAL at byte offset 32 in DB10, for 1200/1500 only
 - DB10,INT6 - DB10.DBW6 as INT
 - DB10,I6 -same as above
 - DB10,INT6.2 - DB10.DBW6 and DB10.DBW8 in an array with length 2

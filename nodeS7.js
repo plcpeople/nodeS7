@@ -45,12 +45,12 @@ function NodeS7(opts) {
 
 	var self = this;
 
-	self.connectReq = new Buffer([0x03, 0x00, 0x00, 0x16, 0x11, 0xe0, 0x00, 0x00, 0x00, 0x02, 0x00, 0xc0, 0x01, 0x0a, 0xc1, 0x02, 0x01, 0x00, 0xc2, 0x02, 0x01, 0x02]);
-	self.negotiatePDU = new Buffer([0x03, 0x00, 0x00, 0x19, 0x02, 0xf0, 0x80, 0x32, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x08, 0x00, 0x08, 0x03, 0xc0]);
-	self.readReqHeader = new Buffer([0x03, 0x00, 0x00, 0x1f, 0x02, 0xf0, 0x80, 0x32, 0x01, 0x00, 0x00, 0x08, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x04, 0x01]);
-	self.readReq = new Buffer(1500);
-	self.writeReqHeader = new Buffer([0x03, 0x00, 0x00, 0x1f, 0x02, 0xf0, 0x80, 0x32, 0x01, 0x00, 0x00, 0x08, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x05, 0x01]);
-	self.writeReq = new Buffer(1500);
+	self.connectReq = Buffer.from([0x03, 0x00, 0x00, 0x16, 0x11, 0xe0, 0x00, 0x00, 0x00, 0x02, 0x00, 0xc0, 0x01, 0x0a, 0xc1, 0x02, 0x01, 0x00, 0xc2, 0x02, 0x01, 0x02]);
+	self.negotiatePDU = Buffer.from([0x03, 0x00, 0x00, 0x19, 0x02, 0xf0, 0x80, 0x32, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x08, 0x00, 0x08, 0x03, 0xc0]);
+	self.readReqHeader = Buffer.from([0x03, 0x00, 0x00, 0x1f, 0x02, 0xf0, 0x80, 0x32, 0x01, 0x00, 0x00, 0x08, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x04, 0x01]);
+	self.readReq = Buffer.alloc(1500);
+	self.writeReqHeader = Buffer.from([0x03, 0x00, 0x00, 0x1f, 0x02, 0xf0, 0x80, 0x32, 0x01, 0x00, 0x00, 0x08, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x05, 0x01]);
+	self.writeReq = Buffer.alloc(1500);
 
 	self.resetPending = false;
 	self.resetTimeout = undefined;
@@ -251,13 +251,19 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 	if (packetType === "read") {
 		outputLog("READ TIMEOUT on sequence number " + packetSeqNum, 0, self.connectionID);
 		self.readResponse(undefined, self.findReadIndexOfSeqNum(packetSeqNum));
-		self.connectionReset();
+		if (self.isoConnectionState === 4) {
+			outputLog("ConnectionReset from read packet timeout.", 0, self.connectionID);
+			self.connectionReset();
+		}
 		return undefined;
 	}
 	if (packetType === "write") {
 		outputLog("WRITE TIMEOUT on sequence number " + packetSeqNum, 0, self.connectionID);
 		self.writeResponse(undefined, self.findWriteIndexOfSeqNum(packetSeqNum));
-		self.connectionReset();
+		if (self.isoConnectionState === 4) {
+			outputLog("ConnectionReset from write packet timeout.", 0, self.connectionID);
+			self.connectionReset();
+		}
 		return undefined;
 	}
 	outputLog("Unknown timeout error.  Nothing was done - this shouldn't happen.");
@@ -1027,7 +1033,7 @@ Reason: We could have some packets waiting for timeout from the PLC, and others 
 NodeS7.prototype.sendWritePacket = function() {
 	var self = this, i, dataBuffer, itemBuffer, dataBufferPointer, flagReconnect;
 
-	dataBuffer = new Buffer(8192);
+	dataBuffer = Buffer.alloc(8192);
 
 	self.writeInQueue = false;
 
@@ -1355,7 +1361,7 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 	}
 
 	for (var itemCount = 0; itemCount < self.readPacketArray[foundSeqNum].itemList.length; itemCount++) {
-		dataPointer = processS7Packet(data, self.readPacketArray[foundSeqNum].itemList[itemCount], dataPointer);
+		dataPointer = processS7Packet(data, self.readPacketArray[foundSeqNum].itemList[itemCount], dataPointer, self.connectionID);
 		if (!dataPointer) {
 			outputLog('Received a ZERO RESPONSE Processing Read Packet due to unrecoverable packet error', 0, self.connectionID);
 			// We rely on this for our timeout.
@@ -1424,7 +1430,7 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 			}
 		}
 		if (!self.isReading() && self.writeInQueue) {
-			outputlog("SendWritePacket called because write was queued.");
+			outputLog("SendWritePacket called because write was queued.", 0, self.connectionID);
 			self.sendWritePacket();
 		}
 	} else {
@@ -1476,7 +1482,7 @@ NodeS7.prototype.connectionReset = function() {
 	var self = this;
 	self.isoConnectionState = 0;
 	self.resetPending = true;
-	outputLog('ConnectionReset is happening');
+	outputLog('ConnectionReset is happening', 0, self.connectionID);
 	if (!self.isReading() && !self.isWriting() && !self.writeInQueue && typeof(self.resetTimeout) === 'undefined') { // We can no longer logically ignore writes here
 		self.resetTimeout = setTimeout(function() {
 			self.resetNow.apply(self, arguments);
@@ -1489,21 +1495,21 @@ NodeS7.prototype.resetNow = function() {
 	var self = this;
 	self.isoConnectionState = 0;
 	self.isoclient.end();
-	outputLog('ResetNOW is happening');
+	outputLog('ResetNOW is happening', 0, self.connectionID);
 	self.resetPending = false;
 	// In some cases, we can have a timeout scheduled for a reset, but we don't want to call it again in that case.
 	// We only want to call a reset just as we are returning values.  Otherwise, we will get asked to read // more values and we will "break our promise" to always return something when asked.
 	if (typeof (self.resetTimeout) !== 'undefined') {
 		clearTimeout(self.resetTimeout);
 		self.resetTimeout = undefined;
-		outputLog('Clearing an earlier scheduled reset');
+		outputLog('Clearing an earlier scheduled reset', 0, self.connectionID);
 	}
 }
 
 NodeS7.prototype.connectionCleanup = function() {
 	var self = this;
 	self.isoConnectionState = 0;
-	outputLog('Connection cleanup is happening');
+	outputLog('Connection cleanup is happening', 0, self.connectionID);
 	if (typeof (self.isoclient) !== "undefined") {
 		// destroy the socket connection
 		self.isoclient.destroy();
@@ -1556,7 +1562,7 @@ function checkRFCData(data){
 }
 
 function S7AddrToBuffer(addrinfo, isWriting) {
-	var thisBitOffset = 0, theReq = new Buffer([0x12, 0x0a, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+	var thisBitOffset = 0, theReq = Buffer.from([0x12, 0x0a, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
 	// First 3 bytes (0,1,2) is constant, sniffed from other traffic, for S7 head.
 	// Next one is "byte length" - we always request X number of bytes - even for a REAL with length of 1 we read BYTES length of 4.
@@ -1591,20 +1597,20 @@ function S7AddrToBuffer(addrinfo, isWriting) {
 	return theReq;
 }
 
-function processS7Packet(theData, theItem, thePointer) {
+function processS7Packet(theData, theItem, thePointer, theCID) {
 
 	var remainingLength;
 
 	if (typeof (theData) === "undefined") {
 		remainingLength = 0;
-		outputLog("Processing an undefined packet, likely due to timeout error");
+		outputLog("Processing an undefined packet, likely due to timeout error", 0, theCID);
 	} else {
 		remainingLength = theData.length - thePointer;  // Say if length is 39 and pointer is 35 we can access 35,36,37,38 = 4 bytes.
 	}
 	var prePointer = thePointer;
 
 	// Create a new buffer for the quality.
-	theItem.qualityBuffer = new Buffer(theItem.byteLength);
+	theItem.qualityBuffer = Buffer.alloc(theItem.byteLength);
 	theItem.qualityBuffer.fill(0xFF);  // Fill with 0xFF (255) which means NO QUALITY in the OPC world.
 
 	if (remainingLength < 4) {
@@ -1614,7 +1620,7 @@ function processS7Packet(theData, theItem, thePointer) {
 		} else {
 			theItem.errCode = "Timeout error - zero length packet";
 		}
-		outputLog(theItem.errCode);
+		outputLog(theItem.errCode, 0, theCID);
 		return 0;   			// Hard to increment the pointer so we call it a malformed packet and we're done.
 	}
 
@@ -1629,27 +1635,27 @@ function processS7Packet(theData, theItem, thePointer) {
 	var transportCode = theData[thePointer + 1];
 
 	if (remainingLength == (reportedDataLength + 2)) {
-		outputLog("Not last part.");
+		outputLog("Not last part.", 0, theCID);
 	}
 
 	if (remainingLength < reportedDataLength + 2) {
 		theItem.valid = false;
 		theItem.errCode = 'Malformed Packet - Item Data Length and Packet Length Disagree.  RDL+2 ' + (reportedDataLength + 2) + ' remainingLength ' + remainingLength;
-		outputLog(theItem.errCode);
+		outputLog(theItem.errCode, 0 , theCID);
 		return 0;   			// Hard to increment the pointer so we call it a malformed packet and we're done.
 	}
 
 	if (responseCode !== 0xff) {
 		theItem.valid = false;
 		theItem.errCode = 'Invalid Response Code - ' + responseCode;
-		outputLog(theItem.errCode);
+		outputLog(theItem.errCode, 0 , theCID);
 		return thePointer + reportedDataLength + 4;
 	}
 
 	if (transportCode !== theItem.readTransportCode) {
 		theItem.valid = false;
 		theItem.errCode = 'Invalid Transport Code - ' + transportCode;
-		outputLog(theItem.errCode);
+		outputLog(theItem.errCode, 0 , theCID);
 		return thePointer + reportedDataLength + 4;
 	}
 
@@ -1658,7 +1664,7 @@ function processS7Packet(theData, theItem, thePointer) {
 	if (reportedDataLength !== expectedLength) {
 		theItem.valid = false;
 		theItem.errCode = 'Invalid Response Length - Expected ' + expectedLength + ' but got ' + reportedDataLength + ' bytes.';
-		outputLog(theItem.errCode);
+		outputLog(theItem.errCode, 0 , theCID);
 		return reportedDataLength + 2;
 	}
 
@@ -1791,6 +1797,9 @@ function processS7ReadItem(theItem) {
 					case "LREAL":
 						theItem.value.push(theItem.byteBuffer.readDoubleBE(thePointer));
 						break;
+					case "LINT":
+//						theItem.value.push(theItem.byteBuffer.readBigInt64BE(thePointer));
+						break;
 					case "DWORD":
 						theItem.value.push(theItem.byteBuffer.readUInt32BE(thePointer));
 						break;
@@ -1865,6 +1874,9 @@ function processS7ReadItem(theItem) {
 				case "LREAL":
 					theItem.value = theItem.byteBuffer.readDoubleBE(thePointer);
 					break;
+				case "LINT":
+//					theItem.value = theItem.byteBuffer.readBigInt64BE(thePointer);
+					break;
 				case "DWORD":
 					theItem.value = theItem.byteBuffer.readUInt32BE(thePointer);
 					break;
@@ -1927,12 +1939,12 @@ function getWriteBuffer(theItem) {
 	//  but the last request.  The last request must have no padding.  So we DO NOT add the padding here anymore.
 
 	if (theItem.datatype === 'X' && theItem.arrayLength === 1) {
-		newBuffer = new Buffer(2 + 3); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
+		newBuffer = Buffer.alloc(2 + 3); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
 		// Initialize, especially be sure to get last bit which may be a fill bit.
 		newBuffer.fill(0);
 		newBuffer.writeUInt16BE(1, 2); // Might need to do something different for different trans codes
 	} else {
-		newBuffer = new Buffer(theItem.byteLength + 4); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
+		newBuffer = Buffer.alloc(theItem.byteLength + 4); // Changed from 2 + 4 to 2 + 3 as padding was moved out of this function
 		newBuffer.fill(0);
 		newBuffer.writeUInt16BE(theItem.byteLength * 8, 2); // Might need to do something different for different trans codes
 	}
@@ -1964,6 +1976,9 @@ function bufferizeS7Item(theItem) {
 					break;
 				case "LREAL":
 					theItem.writeBuffer.writeDoubleBE(theItem.writeValue[arrayIndex], thePointer);
+					break;
+				case "LINT":
+//					theItem.writeBuffer.writeBigInt64BE(theItem.writeValue[arrayIndex], thePointer);
 					break;
 				case "DWORD":
 					theItem.writeBuffer.writeInt32BE(theItem.writeValue[arrayIndex], thePointer);
@@ -2039,6 +2054,9 @@ function bufferizeS7Item(theItem) {
 				break;
 			case "LREAL":
 				theItem.writeBuffer.writeDoubleBE(theItem.writeValue, thePointer);
+				break;
+			case "LINT":
+//				theItem.writeBuffer.writeBigInt64BE(theItem.writeValue, thePointer);
 				break;
 			case "DWORD":
 				theItem.writeBuffer.writeUInt32BE(theItem.writeValue, thePointer);
@@ -2254,6 +2272,11 @@ function stringToS7Addr(addr, useraddr) {
 				theItem.addrtype = "I";
 				theItem.datatype = "LREAL";
 				break;
+			case "ILI":
+			case "ELI":
+				theItem.addrtype = "I";
+				theItem.datatype = "LINT";
+				break;
 /* All styles of standard outputs (in oposit to peripheral outputs) */
 			case "Q":
 			case "A":
@@ -2300,6 +2323,11 @@ function stringToS7Addr(addr, useraddr) {
 				theItem.addrtype = "Q";
 				theItem.datatype = "LREAL";
 				break;
+			case "QLI":
+			case "ALI":
+				theItem.addrtype = "Q";
+				theItem.datatype = "LINT";
+				break;
 /* All styles of marker */
 			case "M":
 				theItem.addrtype = "M";
@@ -2336,6 +2364,10 @@ function stringToS7Addr(addr, useraddr) {
 			case "MLR":
 				theItem.addrtype = "M";
 				theItem.datatype = "LREAL";
+				break;
+			case "MLI":
+				theItem.addrtype = "M";
+				theItem.datatype = "LINT";
 				break;
 /* Timer */
 			case "T":
@@ -2386,8 +2418,12 @@ function stringToS7Addr(addr, useraddr) {
 	if (theItem.datatype === 'LR') {
 		theItem.datatype = 'LREAL';
 	}
+	if (theItem.datatype === 'LI') {
+		theItem.datatype = 'LINT';
+	}
 	switch (theItem.datatype) {
 		case "LREAL":
+		case "LINT":
 			theItem.dtypelen = 8;
 			break;
 		case "REAL":
@@ -2514,13 +2550,13 @@ function S7Item() { // Object
 	this.writeTransportCode = undefined;
 
 	// This is where the data can go that arrives in the packet, before calculating the value.
-	this.byteBuffer = new Buffer(8192);
-	this.writeBuffer = new Buffer(8192);
+	this.byteBuffer = Buffer.alloc(8192);
+	this.writeBuffer = Buffer.alloc(8192);
 
 	// We use the "quality buffer" to keep track of whether or not the requests were successful.
 	// Otherwise, it is too easy to lose track of arrays that may only be partially complete.
-	this.qualityBuffer = new Buffer(8192);
-	this.writeQualityBuffer = new Buffer(8192);
+	this.qualityBuffer = Buffer.alloc(8192);
+	this.writeQualityBuffer = Buffer.alloc(8192);
 
 	// Then we have item properties
 	this.value = undefined;
@@ -2554,6 +2590,7 @@ function S7Item() { // Object
 			case "DWORD":
 			case "DINT":
 			case "INT":
+			case "LINT":
 			case "WORD":
 			case "B":
 			case "BYTE":
