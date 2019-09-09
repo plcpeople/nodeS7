@@ -41,7 +41,7 @@ describe('NodeS7 Address Parser', () => {
         expect(typeof parse).to.be.equal('function');
     });
 
-    function decodeAddress(address, addrtype, datatype, dtypelen, offset, bitOffset, arrayLength, dbNumber, readTransportCode, writeTransportCode, areaCode, byteLength) {
+    function decodeAddress(address, addrtype, datatype, dtypelen, offset, bitOffset, arrayLength, dbNumber, readTransportCode, writeTransportCode, areaCode, byteLength, byteLengthWrite) {
         it(`should decode address "${address}"`, (done) => {
             expect(parse(address)).to.be.deep.equal({
                 addrtype,
@@ -55,6 +55,7 @@ describe('NodeS7 Address Parser', () => {
                 writeTransportCode,
                 areaCode,
                 byteLength,
+                byteLengthWrite,
                 byteLengthWithFill: byteLength + (byteLength % 2)
             });
             done();
@@ -69,48 +70,48 @@ describe('NodeS7 Address Parser', () => {
     }
 
     // -- single input bit
-    decodeAddress('I0.0', 'I', 'X', 1, 0, 0, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1);
-    decodeAddress('E0.6', 'I', 'X', 1, 0, 6, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1);
-    decodeAddress('I5.0', 'I', 'X', 1, 5, 0, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1);
-    decodeAddress('E241.1', 'I', 'X', 1, 241, 1, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1);
+    decodeAddress('I0.0', 'I', 'X', 1, 0, 0, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1, 1);
+    decodeAddress('E0.6', 'I', 'X', 1, 0, 6, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1, 1);
+    decodeAddress('I5.0', 'I', 'X', 1, 5, 0, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1, 1);
+    decodeAddress('E241.1', 'I', 'X', 1, 241, 1, 1, undefined, R_BYTE, W_BIT, A_INPUTS, 1, 1);
 
     // -- array of input bits
-    decodeAddress('I0.0.5', 'I', 'X', 1, 0, 0, 5, undefined, R_BYTE, W_BYTE, A_INPUTS, 1);
-    decodeAddress('E0.6.4', 'I', 'X', 1, 0, 6, 4, undefined, R_BYTE, W_BYTE, A_INPUTS, 2);
-    decodeAddress('I5.0.20', 'I', 'X', 1, 5, 0, 20, undefined, R_BYTE, W_BYTE, A_INPUTS, 3);
-    decodeAddress('E241.1.8', 'I', 'X', 1, 241, 1, 8, undefined, R_BYTE, W_BYTE, A_INPUTS, 2);
+    decodeAddress('I0.0.5', 'I', 'X', 1, 0, 0, 5, undefined, R_BYTE, W_BIT, A_INPUTS, 1, 5);
+    decodeAddress('E0.6.4', 'I', 'X', 1, 0, 6, 4, undefined, R_BYTE, W_BIT, A_INPUTS, 2, 4);
+    decodeAddress('I5.0.20', 'I', 'X', 1, 5, 0, 20, undefined, R_BYTE, W_BIT, A_INPUTS, 3, 20);
+    decodeAddress('E241.1.8', 'I', 'X', 1, 241, 1, 8, undefined, R_BYTE, W_BIT, A_INPUTS, 2, 8);
 
     // -- single input byte
-    decodeAddress('IB0', 'I', 'BYTE', 1, 0, 0, 1, undefined, R_BYTE, W_BYTE, A_INPUTS, 1);
-    decodeAddress('EB25', 'I', 'BYTE', 1, 25, 0, 1, undefined, R_BYTE, W_BYTE, A_INPUTS, 1);
-    decodeAddress('IB452', 'I', 'BYTE', 1, 452, 0, 1, undefined, R_BYTE, W_BYTE, A_INPUTS, 1);
+    decodeAddress('IB0', 'I', 'BYTE', 1, 0, 0, 1, undefined, R_BYTE, W_BYTE, A_INPUTS, 1, 1);
+    decodeAddress('EB25', 'I', 'BYTE', 1, 25, 0, 1, undefined, R_BYTE, W_BYTE, A_INPUTS, 1, 1);
+    decodeAddress('IB452', 'I', 'BYTE', 1, 452, 0, 1, undefined, R_BYTE, W_BYTE, A_INPUTS, 1, 1);
 
     // -- array of input bytes
-    decodeAddress('EB0.101', 'I', 'BYTE', 1, 0, 0, 101, undefined, R_BYTE, W_BYTE, A_INPUTS, 101);
-    decodeAddress('IB25.12', 'I', 'BYTE', 1, 25, 0, 12, undefined, R_BYTE, W_BYTE, A_INPUTS, 12);
-    decodeAddress('EB452.2', 'I', 'BYTE', 1, 452, 0, 2, undefined, R_BYTE, W_BYTE, A_INPUTS, 2);
+    decodeAddress('EB0.101', 'I', 'BYTE', 1, 0, 0, 101, undefined, R_BYTE, W_BYTE, A_INPUTS, 101, 101);
+    decodeAddress('IB25.12', 'I', 'BYTE', 1, 25, 0, 12, undefined, R_BYTE, W_BYTE, A_INPUTS, 12, 12);
+    decodeAddress('EB452.2', 'I', 'BYTE', 1, 452, 0, 2, undefined, R_BYTE, W_BYTE, A_INPUTS, 2, 2);
 
     // -- single output bit
-    decodeAddress('Q0.0', 'Q', 'X', 1, 0, 0, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1);
-    decodeAddress('A0.6', 'Q', 'X', 1, 0, 6, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1);
-    decodeAddress('Q5.0', 'Q', 'X', 1, 5, 0, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1);
-    decodeAddress('A241.1', 'Q', 'X', 1, 241, 1, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1);
+    decodeAddress('Q0.0', 'Q', 'X', 1, 0, 0, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1, 1);
+    decodeAddress('A0.6', 'Q', 'X', 1, 0, 6, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1, 1);
+    decodeAddress('Q5.0', 'Q', 'X', 1, 5, 0, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1, 1);
+    decodeAddress('A241.1', 'Q', 'X', 1, 241, 1, 1, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1, 1);
 
     // -- array of output bits
-    decodeAddress('Q0.0.5', 'Q', 'X', 1, 0, 0, 5, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1);
-    decodeAddress('A0.6.4', 'Q', 'X', 1, 0, 6, 4, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 2);
-    decodeAddress('Q5.0.20', 'Q', 'X', 1, 5, 0, 20, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 3);
-    decodeAddress('A241.1.8', 'Q', 'X', 1, 241, 1, 8, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 2);
+    decodeAddress('Q0.0.5', 'Q', 'X', 1, 0, 0, 5, undefined, R_BYTE, W_BIT, A_OUTPUTS, 1, 5);
+    decodeAddress('A0.6.4', 'Q', 'X', 1, 0, 6, 4, undefined, R_BYTE, W_BIT, A_OUTPUTS, 2, 4);
+    decodeAddress('Q5.0.20', 'Q', 'X', 1, 5, 0, 20, undefined, R_BYTE, W_BIT, A_OUTPUTS, 3, 20);
+    decodeAddress('A241.1.8', 'Q', 'X', 1, 241, 1, 8, undefined, R_BYTE, W_BIT, A_OUTPUTS, 2, 8);
 
     // -- single output byte
-    decodeAddress('QB0', 'Q', 'BYTE', 1, 0, 0, 1, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1);
-    decodeAddress('AB25', 'Q', 'BYTE', 1, 25, 0, 1, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1);
-    decodeAddress('QB452', 'Q', 'BYTE', 1, 452, 0, 1, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1);
+    decodeAddress('QB0', 'Q', 'BYTE', 1, 0, 0, 1, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1, 1);
+    decodeAddress('AB25', 'Q', 'BYTE', 1, 25, 0, 1, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1, 1);
+    decodeAddress('QB452', 'Q', 'BYTE', 1, 452, 0, 1, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 1, 1);
 
     // -- array of output bytes
-    decodeAddress('AB0.101', 'Q', 'BYTE', 1, 0, 0, 101, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 101);
-    decodeAddress('QB25.12', 'Q', 'BYTE', 1, 25, 0, 12, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 12);
-    decodeAddress('AB452.2', 'Q', 'BYTE', 1, 452, 0, 2, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 2);
+    decodeAddress('AB0.101', 'Q', 'BYTE', 1, 0, 0, 101, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 101, 101);
+    decodeAddress('QB25.12', 'Q', 'BYTE', 1, 25, 0, 12, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 12, 12);
+    decodeAddress('AB452.2', 'Q', 'BYTE', 1, 452, 0, 2, undefined, R_BYTE, W_BYTE, A_OUTPUTS, 2, 2);
 
     // TODO: Add more addresses
     
