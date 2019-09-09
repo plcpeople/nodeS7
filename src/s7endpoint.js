@@ -37,9 +37,15 @@ const CONN_CONNECTED = 2;
 const CONN_DISCONNECTING = 3;
 
 /**
+ * Emitted when an error occurs with the underlying
+ * transport or the underlying connection
+ * @event S7Endpoint#error
+ * @param {*} e the error
+ */
+
+/**
  * Represents a S7 PLC, handling the connection to it and
  * allowing to call methods that act on it
- * @emits pdu-size when a change in the negotiated PDU size happens
  */
 class S7Endpoint extends EventEmitter {
 
@@ -47,7 +53,7 @@ class S7Endpoint extends EventEmitter {
      * Creates a new S7Endpoint
      * 
      * @param {object}  opts the options object
-     * @param {string}  [opts.type] the type of the connection to the PLC, either "tcp" or "mpi". If left undefined, will be automatically infered from the presence of the "host" or the "mpiAddress" parameters
+     * @param {string}  [opts.type] the type of the connection to the PLC, either "tcp" or "mpi". If left undefined, will be automatically infered from the presence of the "host" or the "mpiAdapter" parameters
      * @param {string}  [opts.host] the hostname or IP Address to connect to. Infers "tcp" type of connection
      * @param {number}  [opts.port=102] the TCP port to connect to
      * @param {number}  [opts.rack=0] the rack on the PLC configuration
@@ -56,7 +62,7 @@ class S7Endpoint extends EventEmitter {
      * @param {number}  [opts.dstTSAP=0x0102] the destination TSAP, when connecting using TSAP method
      * @param {*}       [opts.mpiAdapter] the MPI adapter used to communicate to the PLC. Infers "mpi" type of connection
      * @param {number}  [opts.mpiAddress=2] the address of the PLC on the MPI bus
-     * @param {number}  [opts.autoReconnect=5000] the time to wait before trying to connect to the PLC again, in ms. If set to 0, disable the functionality
+     * @param {number}  [opts.autoReconnect=5000] the time to wait before trying to connect to the PLC again, in ms. If set to 0, disables the functionality
      * @param {object}  [opts.s7ConnOpts] the {@link S7Connection} constructor options, allowing to fine-tune specific parameters
      * 
      * @throws {Error} Will throw an error if invalid options are passed
@@ -331,7 +337,7 @@ class S7Endpoint extends EventEmitter {
 
         clearTimeout(this._reconnectTimer);
 
-        if (this._autoReconnect > 0){
+        if (this._autoReconnect > 0) {
             this._reconnectTimer = setTimeout(() => {
                 debug("S7Endpoint _scheduleReconnection timeout-fired");
                 this._connect();
@@ -343,6 +349,11 @@ class S7Endpoint extends EventEmitter {
         debug("S7Endpoint _onConnectionConnected");
 
         if (this._pduSize != this._connection.pduSize) {
+            /**
+             * Emitted when the negotiated PDU size has changed
+             * @event S7Connection#pdu-size
+             * @param {number} pduSize the new PDU size negotiated
+             */
             this.emit("pdu-size", this._connection.pduSize);
         }
         this._pduSize = this._connection.pduSize;
@@ -351,7 +362,7 @@ class S7Endpoint extends EventEmitter {
         /**
          * Emitted when we're connected to the PLC and
          * ready to communicate
-         * @event S7Connection#connect
+         * @event S7Endpoint#connect
          */
         this.emit('connect');
     }
@@ -610,7 +621,7 @@ class S7Endpoint extends EventEmitter {
         });
 
     }
-    
+
     /**
      * Writes arbitrary length of data into a memory area of 
      * the PLC. This method accounts for the negotiated PDU 

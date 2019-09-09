@@ -37,6 +37,14 @@ const CONN_CONNECTED = 2;
 const CONN_DISCONNECTED = 3;
 const CONN_ERROR = 99;
 
+
+/**
+ * Emitted when an error occurs while communicating
+ * with the PLC
+ * @event S7Connection#error
+ * @param {*} e the error
+ */
+
 /**
  * @emits connect
  * @emits message
@@ -171,12 +179,22 @@ class S7Connection extends EventEmitter {
 
             this._connectionState = CONN_CONNECTED;
 
+            /**
+             * Emitted when the connection is negotiated and established
+             * @event S7Connection#connect
+             */
             process.nextTick(() => this.emit('connect'));
 
             return;
         }
 
         // emits any unhandled message
+        /**
+         * Emitted on all incoming packets from the PLC that
+         * are NOT response of a request in the queue
+         * @event S7Connection#timeout
+         * @param {object} data The job's payload, if available
+         */
         this.emit('message', data);
     }
 
@@ -189,7 +207,14 @@ class S7Connection extends EventEmitter {
 
         if (job) job.rej(new Error("Request timeout"));
 
-        this.emit('timeout');
+        /**
+         * Emitted when a job times out. The job currently in
+         * progress that caused the timeout already gets its 
+         * promise rejected
+         * @event S7Connection#timeout
+         * @param {object} [payload] The job's payload, if available
+         */
+        this.emit('timeout', job && job.payload);
     }
 
     _processQueue() {

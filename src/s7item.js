@@ -190,7 +190,8 @@ class S7Item extends EventEmitter {
     }
 
     /**
-     * 
+     * Returns a buffer with the data to be written to the PLC, 
+     * according to the type of the item and the values provided
      * @param {*} value array of values
      */
     getWriteBuffer(value) {

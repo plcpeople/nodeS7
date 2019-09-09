@@ -55,6 +55,10 @@ class S7ItemGroup extends EventEmitter {
         this._endpoint.on('pdu-size', () => this._invalidateReadPackets());
     }
 
+    /**
+     * Initialize/reset state
+     * @private
+     */
     _initParams() {
         debug('S7ItemGroup _initParams');
         this._items = new Map();
@@ -64,10 +68,19 @@ class S7ItemGroup extends EventEmitter {
         this._lastResponseTime = null;
     }
 
+    /**
+     * A default translation callback that simply returns the same value
+     * @private
+     * @param {string} tag 
+     */
     _defaultTranslationCallback(tag) {
         return tag;
     }
 
+    /**
+     * Prepare and optimize the read packets needed to be sent when reading this group
+     * @private
+     */
     _prepareReadPackets() {
         debug('S7ItemGroup _prepareReadPackets');
 
@@ -285,6 +298,10 @@ class S7ItemGroup extends EventEmitter {
         }
     }
 
+    /**
+     * Invalidate/delete the current already-optimized read packets
+     * @private
+     */
     _invalidateReadPackets() {
         debug('S7ItemGroup _invalidateReadPackets');
 
@@ -295,6 +312,7 @@ class S7ItemGroup extends EventEmitter {
     /**
      * Checks whether two S7Items can be grouped into the same request
      * 
+     * @private
      * @param {S7Item} a the first S7Item
      * @param {S7Item} b the second S7Item
      * @returns a boolean indicating whether the two items can be grouped into the same request
@@ -399,6 +417,7 @@ class S7ItemGroup extends EventEmitter {
     }
 
     /**
+     * Writes the provided items with the provided values on the PLC
      * 
      * @param {string|Array<string>} tags 
      * @param {*|Array<*>} values 
@@ -442,14 +461,14 @@ class S7ItemGroup extends EventEmitter {
         for (let i = 0; i < tags.length; i++) {
             const tag = tags[i];
             const value = values[i];
-            
+
             if (typeof tag !== 'string') {
                 throw new Error("Tags must be of string type");
             }
 
             // find item on our list first, so we don't need to create a new one
             let item = this._items.get(tag);
-            if(!item){
+            if (!item) {
                 let addr = this._translationCallback(tag);
                 item = new S7Item(tag, addr);
             }
@@ -473,7 +492,7 @@ class S7ItemGroup extends EventEmitter {
 
             let bitAddr = item.transport === constants.proto.transport.BIT;
             reqItems.push({
-                area: item.areaCode, 
+                area: item.areaCode,
                 db: item.dbNumber,
                 address: bitAddr ? (item.offset << 3) + item.bitOffset : item.offset,
                 transport: item.readTransportCode,
@@ -508,7 +527,7 @@ class S7ItemGroup extends EventEmitter {
     }
 
     /**
-     * 
+     * Reads the values of all items in this group
      */
     async readAllItems() {
         debug("S7ItemGroup readAllItems");
