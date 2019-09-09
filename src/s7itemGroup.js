@@ -579,7 +579,8 @@ class S7ItemGroup extends EventEmitter {
 module.exports = S7ItemGroup;
 
 /**
- * 
+ * Custom item list sorter
+ * @private
  * @param {S7Item} a 
  * @param {S7Item} b 
  */

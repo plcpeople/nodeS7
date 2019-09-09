@@ -28,7 +28,7 @@ const constants = require('./constants.json');
 const util = require('util');
 const debug = util.debuglog('nodes7');
 
-const parseAddress_NodeS7 = require('./addressParser/nodes7.js');
+const AddressParserNodeS7 = require('./addressParser/nodes7.js');
 
 class S7Item extends EventEmitter {
 
@@ -47,7 +47,7 @@ class S7Item extends EventEmitter {
         this._address = address;
         this._value = undefined;
 
-        this._props = parseAddress_NodeS7(this._address);
+        this._props = AddressParserNodeS7.parse(this._address);
         this._string = `S7Item ${this._name}:[${this._address}]`;
 
         this._dataBuffer = Buffer.alloc(this._props.byteLength);
@@ -270,7 +270,8 @@ class S7Item extends EventEmitter {
 }
 
 /**
- * 
+ * Reads data from the buffer according to the item's type
+ * @private
  * @param {Buffer} buffer the Buffer containing the data
  * @param {string} type the data type
  * @param {number} offset from where to get the data
@@ -309,7 +310,8 @@ function getValueByDataType(buffer, type, offset, bitOffset, length = 1) {
 }
 
 /**
- * 
+ * Writes data to buffer according to the item's type
+ * @private
  * @param {Buffer} buffer the Buffer containing the data
  * @param {*} data the Buffer containing the data
  * @param {string} type the data type

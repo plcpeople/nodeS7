@@ -24,7 +24,7 @@
 const {
     expect
 } = require('chai');
-const parse = require('../../src/addressParser/nodes7.js');
+const parse = require('../../src/addressParser/nodes7.js').parse;
 const constants = require('../../src/constants.json');
 
 const R_BYTE = constants.proto.transport.BYTE;

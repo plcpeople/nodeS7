@@ -27,7 +27,8 @@ const util = require('util');
 const debug = util.debuglog('nodes7');
 
 /**
- * Helper
+ * Helper to convert from BCD notation
+ * @private
  * @param {number} i 
  */
 function fromBCD(i) {
