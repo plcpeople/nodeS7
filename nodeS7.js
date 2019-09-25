@@ -250,20 +250,20 @@ NodeS7.prototype.packetTimeout = function(packetType, packetSeqNum) {
 	}
 	if (packetType === "read") {
 		outputLog("READ TIMEOUT on sequence number " + packetSeqNum, 0, self.connectionID);
-		self.readResponse(undefined, self.findReadIndexOfSeqNum(packetSeqNum));
-		if (self.isoConnectionState === 4) {
+		if (self.isoConnectionState === 4) { // Reset before calling writeResponse so ResetNow will take place this cycle 
 			outputLog("ConnectionReset from read packet timeout.", 0, self.connectionID);
 			self.connectionReset();
 		}
+		self.readResponse(undefined, self.findReadIndexOfSeqNum(packetSeqNum));
 		return undefined;
 	}
 	if (packetType === "write") {
 		outputLog("WRITE TIMEOUT on sequence number " + packetSeqNum, 0, self.connectionID);
-		self.writeResponse(undefined, self.findWriteIndexOfSeqNum(packetSeqNum));
-		if (self.isoConnectionState === 4) {
+		if (self.isoConnectionState === 4) { // Reset before calling writeResponse so ResetNow will take place this cycle 
 			outputLog("ConnectionReset from write packet timeout.", 0, self.connectionID);
 			self.connectionReset();
 		}
+		self.writeResponse(undefined, self.findWriteIndexOfSeqNum(packetSeqNum));
 		return undefined;
 	}
 	outputLog("Unknown timeout error.  Nothing was done - this shouldn't happen.");
@@ -1298,8 +1298,10 @@ NodeS7.prototype.writeResponse = function(data, foundSeqNum) {
 	clearTimeout(self.writePacketArray[foundSeqNum].timeout);
 
 	if (!self.writePacketArray.every(doneSending)) {
+		outputLog("Not done sending - sending more packets from writeResponse",1,self.connectionID);
 		self.sendWritePacket();
 	} else {
+		outputLog("Received all packets in writeResponse",1,self.connectionID);
 		for (i = 0; i < self.writePacketArray.length; i++) {
 			self.writePacketArray[i].sent = false;
 			self.writePacketArray[i].rcvd = false;
@@ -1312,7 +1314,7 @@ NodeS7.prototype.writeResponse = function(data, foundSeqNum) {
 			// Loop through the global block list...
 			writePostProcess(self.globalWriteBlockList[i]);
 			for (var k = 0; k < self.globalWriteBlockList[i].itemReference.length; k++) {
-				outputLog(self.globalWriteBlockList[i].itemReference[k].addr + ' write completed with quality ' + self.globalWriteBlockList[i].itemReference[k].writeQuality, 0);
+				outputLog(self.globalWriteBlockList[i].itemReference[k].addr + ' write completed with quality ' + self.globalWriteBlockList[i].itemReference[k].writeQuality, 0, self.connectionID);
 				if (!isQualityOK(self.globalWriteBlockList[i].itemReference[k].writeQuality)) {
 					anyBadQualities = true;
 				}
@@ -1320,12 +1322,16 @@ NodeS7.prototype.writeResponse = function(data, foundSeqNum) {
 //			outputLog(self.globalWriteBlockList[i].addr + ' write completed with quality ' + self.globalWriteBlockList[i].writeQuality, 1, self.connectionID);
 			if (!isQualityOK(self.globalWriteBlockList[i].writeQuality)) { anyBadQualities = true; }
 		}
-		self.writeDoneCallback(anyBadQualities);
 		if (self.resetPending) {
+			outputLog('Calling reset from writeResponse as there is one pending',0,self.connectionID);
 			self.resetNow();
 		}
 		if (self.isoConnectionState === 0) {
 			self.connectNow(self.connectionParams, false);
+		}
+		outputLog('We are calling back our writeDoneCallback.',1,self.connectionID);
+		if (typeof(self.writeDoneCallback) === 'function') {
+			self.writeDoneCallback(anyBadQualities);
 		}
 	}
 }
@@ -1411,24 +1417,28 @@ NodeS7.prototype.readResponse = function(data, foundSeqNum) {
 			}
 		}
 
-		// Inform our user that we are done and that the values are ready for pickup.
-
-		outputLog("We are calling back our readDoneCallback.", 1, self.connectionID);
-		if (typeof (self.readDoneCallback) === 'function') {
-			self.readDoneCallback(anyBadQualities, dataObject);
-		}
 // Not as of Feb 2019		if (self.resetPending) {
 // Not as of Feb 2019			self.resetNow();
 // Not as of Feb 2019		}
 
 		if (!self.writeInQueue) {
 			if (self.resetPending) {
+				outputLog('Calling reset from readResponse as there is one pending',0,self.connectionID);
 				self.resetNow();
 			}
 			if (self.isoConnectionState === 0) {
 				self.connectNow(self.connectionParams, false);
 			}
+		} else {
+			outputLog('Write In Queue.  ICS ' + self.isoConnectionState + ' resetPending ' + self.resetPending,1,self.connectionID);		
 		}
+
+		// Inform our user that we are done and that the values are ready for pickup.
+		outputLog("We are calling back our readDoneCallback.", 1, self.connectionID);
+		if (typeof (self.readDoneCallback) === 'function') {
+			self.readDoneCallback(anyBadQualities, dataObject);
+		}
+
 		if (!self.isReading() && self.writeInQueue) {
 			outputLog("SendWritePacket called because write was queued.", 0, self.connectionID);
 			self.sendWritePacket();
@@ -1482,9 +1492,10 @@ NodeS7.prototype.connectionReset = function() {
 	var self = this;
 	self.isoConnectionState = 0;
 	self.resetPending = true;
-	outputLog('ConnectionReset is happening', 0, self.connectionID);
+	outputLog('ConnectionReset has been called to set the reset as pending', 0, self.connectionID);
 	if (!self.isReading() && !self.isWriting() && !self.writeInQueue && typeof(self.resetTimeout) === 'undefined') { // We can no longer logically ignore writes here
 		self.resetTimeout = setTimeout(function() {
+			outputLog('Timed reset has happened. Ideally this would never be called as reset should be completed when done r/w.',0,self.connectionID);
 			self.resetNow.apply(self, arguments);
 		}, 3500);  // Increased to 3500 to prevent problems with packet timeouts
 	}

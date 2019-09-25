@@ -1,3 +1,7 @@
+Version: 0.3.8
+------------
+- Further improvements on connection reset
+
 Version: 0.3.7
 ------------
 - outputLog spelling correction and connection ID added to some outputLog instances where it was missing
