@@ -382,6 +382,7 @@ NodeS7.prototype.onPDUReply = function(theData) {
 		//Everything OK...go on
 		// Track the connection state
 		self.isoConnectionState = 4;  // 4 = Received PDU response, good to go
+		self.parallelJobsNow = 0;     // We need to zero this here as it can go negative when not connected
 
 		var partnerMaxParallel1 = data.readInt16BE(21);
 		var partnerMaxParallel2 = data.readInt16BE(23);
@@ -994,6 +995,7 @@ NodeS7.prototype.sendReadPacket = function() {
 			//			setTimeout(function(){
 			//				self.connectNow.apply(self, arguments);
 			//			}, 2000, self.connectionParams);
+			// self.parallelJobsNow += 1;  // Note that we don't do this here - we want all packets to time out at once when not connected. 
 			self.readPacketArray[i].sent = true;
 			self.readPacketArray[i].rcvd = false;
 			self.readPacketArray[i].timeoutError = true;

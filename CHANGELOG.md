@@ -1,3 +1,7 @@
+Version: 0.3.9
+------------
+- Fixes for connection reset in cases where enough data was being read that more polls were required than could run in parallel
+
 Version: 0.3.8
 ------------
 - Further improvements on connection reset
