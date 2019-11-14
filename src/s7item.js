@@ -270,6 +270,14 @@ class S7Item extends EventEmitter {
     }
 }
 
+function fromBCD(n) {
+    return ((n >> 4) * 10) + (n & 0xf)
+}
+
+function toBCD(n) {
+    return ((n / 10) << 4) | (n % 10)
+}
+
 /**
  * Reads data from the buffer according to the item's type
  * @private
@@ -280,6 +288,7 @@ class S7Item extends EventEmitter {
  * @param {number} [length] the length for char arrays
  */
 function getValueByDataType(buffer, type, offset, bitOffset, length = 1) {
+    let year, month, day, hour, min, sec, ms_1, ms_2;
     switch (type) {
         case "REAL":
             return buffer.readFloatBE(offset);
@@ -305,6 +314,28 @@ function getValueByDataType(buffer, type, offset, bitOffset, length = 1) {
             return buffer.toString('ascii', offset + 2, offset + 2 + len);
         case "X":
             return !!((buffer.readUInt8(offset) >> bitOffset) & 0x01);
+        case "DT":
+            year = fromBCD(buffer.readUInt8(offset));
+            month = fromBCD(buffer.readUInt8(offset + 1));
+            day = fromBCD(buffer.readUInt8(offset + 2));
+            hour = fromBCD(buffer.readUInt8(offset + 3));
+            min = fromBCD(buffer.readUInt8(offset + 4));
+            sec = fromBCD(buffer.readUInt8(offset + 5));
+            ms_1 = fromBCD(buffer.readUInt8(offset + 6));
+            ms_2 = fromBCD(buffer.readUInt8(offset + 7) & 0xf0);
+            return new Date((year > 89 ? 1900 : 2000) + year, month - 1,
+                day, hour, min, sec, (ms_1 * 10) + (ms_2 / 10))
+        case "DTZ":
+            year = fromBCD(buffer.readUInt8(offset));
+            month = fromBCD(buffer.readUInt8(offset + 1));
+            day = fromBCD(buffer.readUInt8(offset + 2));
+            hour = fromBCD(buffer.readUInt8(offset + 3));
+            min = fromBCD(buffer.readUInt8(offset + 4));
+            sec = fromBCD(buffer.readUInt8(offset + 5));
+            ms_1 = fromBCD(buffer.readUInt8(offset + 6));
+            ms_2 = fromBCD(buffer.readUInt8(offset + 7) & 0xf0);
+            return new Date(Date.UTC((year > 89 ? 1900 : 2000) + year, month - 1,
+                day, hour, min, sec, (ms_1 * 10) + (ms_2 / 10)))
         default:
             throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
     }
@@ -340,6 +371,17 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
         case "X":
             //everything is valid here, JS rules for boolean conversion will apply
             break;
+        case "DT":
+        case "DTZ":
+            if (!(data instanceof Date)){
+                if (data > 631152000000 && data < 3786911999999){
+                    // is between "1990-01-01T00:00:00.000Z" and "2089-12-31T23:59:59.999Z" in JS epoch
+                    data = new Date(data);
+                } else {
+                    throw new Error(`Data for item of type '${type} must be instance of Data`);
+                }
+            }
+            break;
         default:
             throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
     }
@@ -370,6 +412,26 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
             return buffer.write(data, offset + 2, length, 'ascii') + 2;
         case "X":
             return buffer.writeUInt8(data ? 1 : 0, offset);
+        case "DT":
+            buffer.writeUInt8(toBCD(data.getFullYear() % 100), offset);
+            buffer.writeUInt8(toBCD(data.getMonth() + 1), offset + 1);
+            buffer.writeUInt8(toBCD(data.getDate()), offset + 2);
+            buffer.writeUInt8(toBCD(data.getHours()), offset + 3);
+            buffer.writeUInt8(toBCD(data.getMinutes()), offset + 4);
+            buffer.writeUInt8(toBCD(data.getSeconds()), offset + 5);
+            buffer.writeUInt8(toBCD((data.getMilliseconds() / 10) >> 0), offset + 6);
+            buffer.writeUInt8(toBCD(((data.getMilliseconds() % 10) * 10) + (data.getDay() + 1)), offset + 7);
+            break;
+        case "DTZ":
+            buffer.writeUInt8(toBCD(data.getUTCFullYear() % 100), offset);
+            buffer.writeUInt8(toBCD(data.getUTCMonth() + 1), offset + 1);
+            buffer.writeUInt8(toBCD(data.getUTCDate()), offset + 2);
+            buffer.writeUInt8(toBCD(data.getUTCHours()), offset + 3);
+            buffer.writeUInt8(toBCD(data.getUTCMinutes()), offset + 4);
+            buffer.writeUInt8(toBCD(data.getUTCSeconds()), offset + 5);
+            buffer.writeUInt8(toBCD((data.getUTCMilliseconds() / 10) >> 0), offset + 6);
+            buffer.writeUInt8(toBCD(((data.getUTCMilliseconds() % 10) * 10) + (data.getUTCDay() + 1)), offset + 7);
+            break;
         default:
             throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
     }
