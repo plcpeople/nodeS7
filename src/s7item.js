@@ -123,7 +123,7 @@ class S7Item extends EventEmitter {
         let itemEnd = this._props.offset + this._props.byteLength;
         debug('S7Item _getCopyBufferOffsets positions', dataStart, dataEnd, itemStart, itemEnd);
 
-        if (dataStart > itemEnd || dataEnd < itemStart) {
+        if (dataStart >= itemEnd || dataEnd <= itemStart) {
             return null
         }
 
@@ -210,8 +210,8 @@ class S7Item extends EventEmitter {
 
                 let ptr = 0
                 for (let i = 0; i < this._props.arrayLength; i++) {
-                    ptr += this._props.dtypelen;
                     bufferWriteByDataType(b, value[i], this._props.datatype, ptr, this._props.dtypelen - 2);
+                    ptr += this._props.dtypelen;
                 }
             } else {
                 bufferWriteByDataType(b, value, this._props.datatype, 0, this._props.dtypelen - 2);
