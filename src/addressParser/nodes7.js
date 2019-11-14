@@ -102,6 +102,8 @@ class AddressParserNodeS7 {
                 case "WORD":
                 case "DWORD":
                 case "REAL":
+                case "DT":
+                case "DTZ":
                     dataType = match_area;
                     break;
                 case "B":
@@ -247,6 +249,10 @@ class AddressParserNodeS7 {
         }
 
         switch (dataType) {
+            case "DT":
+            case "DTZ":
+                dataTypeLength = 8;
+                break;
             case "REAL":
             case "DWORD":
             case "DINT":
