@@ -490,12 +490,12 @@ class S7ItemGroup extends EventEmitter {
 
             curRequestLength += reqItemLength;
 
-            let bitAddr = item.transport === constants.proto.transport.BIT;
+            let bitAddr = item.writeTransportCode === constants.proto.dataTransport.BBIT;
             reqItems.push({
                 area: item.areaCode,
                 db: item.dbNumber,
                 address: bitAddr ? (item.offset << 3) + item.bitOffset : item.offset,
-                transport: item.readTransportCode,
+                transport: bitAddr ? constants.proto.transport.BIT : item.readTransportCode,
                 dataTransport: item.writeTransportCode,
                 data: buf,
                 length: buf.length
