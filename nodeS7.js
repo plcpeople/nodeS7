@@ -95,6 +95,17 @@ function NodeS7(opts) {
 	self.rereadTimer = undefined;
 }
 
+NodeS7.prototype.getNextSeqNum = function() {
+	var self = this;
+
+	self.masterSequenceNumber += 1;
+	if (self.masterSequenceNumber > 32767) {
+		self.masterSequenceNumber = 1;
+	}
+	outputLog('seqNum is ' + self.masterSequenceNumber, 1, self.connectionID);
+	return self.masterSequenceNumber;
+}
+
 NodeS7.prototype.setTranslationCB = function(cb) {
 	var self = this;
 	if (typeof cb === "function") {
@@ -742,10 +753,6 @@ NodeS7.prototype.prepareWritePacket = function() {
 	while (requestNumber < requestList.length) {
 		// Set up the read packet
 		// Yes this is the same master sequence number shared with the read queue
-		self.masterSequenceNumber += 1;
-		if (self.masterSequenceNumber > 32767) {
-			self.masterSequenceNumber = 1;
-		}
 
 		var numItems = 0;
 
@@ -757,7 +764,7 @@ NodeS7.prototype.prepareWritePacket = function() {
 
 		self.writePacketArray.push(new S7Packet());
 		var thisPacketNumber = self.writePacketArray.length - 1;
-		self.writePacketArray[thisPacketNumber].seqNum = self.masterSequenceNumber;
+		self.writePacketArray[thisPacketNumber].seqNum = self.getNextSeqNum();
 		//		outputLog("Write Sequence Number is " + self.writePacketArray[thisPacketNumber].seqNum);
 
 		self.writePacketArray[thisPacketNumber].itemList = [];  // Initialize as array.
@@ -919,11 +926,6 @@ NodeS7.prototype.prepareReadPacket = function() {
 	self.readPacketArray = [];
 
 	while (requestNumber < requestList.length) {
-		// Set up the read packet
-		self.masterSequenceNumber += 1;
-		if (self.masterSequenceNumber > 32767) {
-			self.masterSequenceNumber = 1;
-		}
 
 		var numItems = 0;
 		self.readReqHeader.copy(self.readReq, 0);
@@ -934,9 +936,8 @@ NodeS7.prototype.prepareReadPacket = function() {
 
 		self.readPacketArray.push(new S7Packet());
 		var thisPacketNumber = self.readPacketArray.length - 1;
-		self.readPacketArray[thisPacketNumber].seqNum = self.masterSequenceNumber;
-		outputLog("Sequence Number is " + self.readPacketArray[thisPacketNumber].seqNum, 1, self.connectionID);
-
+		// don't set a fixed sequence number here. Instead, set it just before sending to avoid conflict with write sequence numbers
+		self.readPacketArray[thisPacketNumber].seqNum = 0;
 		self.readPacketArray[thisPacketNumber].itemList = [];  // Initialize as array.
 
 		for (i = requestNumber; i < requestList.length; i++) {
@@ -969,6 +970,10 @@ NodeS7.prototype.sendReadPacket = function() {
 	for (i = 0; i < self.readPacketArray.length; i++) {
 		if (self.readPacketArray[i].sent) { continue; }
 		if (self.parallelJobsNow >= self.maxParallel) { continue; }
+
+		// Set sequence number of packet here
+		self.readPacketArray[i].seqNum = self.getNextSeqNum();
+
 		// From here down is SENDING the packet
 		self.readPacketArray[i].reqTime = process.hrtime();
 		self.readReq.writeUInt8(self.readPacketArray[i].itemList.length, 18);
@@ -981,6 +986,8 @@ NodeS7.prototype.sendReadPacket = function() {
 		}
 
 		if (self.isoConnectionState == 4) {
+			outputLog('Sending Read Packet With Sequence Number ' + self.readPacketArray[i].seqNum, 1, self.connectionID);
+
 			self.readPacketArray[i].timeout = setTimeout(function() {
 				self.packetTimeout.apply(self, arguments);
 			}, self.globalTimeout, "read", self.readPacketArray[i].seqNum);
@@ -1012,7 +1019,6 @@ NodeS7.prototype.sendReadPacket = function() {
 				self.packetTimeout.apply(self, arguments);
 			}, 0, "read", self.readPacketArray[i].seqNum);
 		}
-		outputLog('Sending Read Packet', 1, self.connectionID);
 	}
 
 /* NOTE: We no longer do this here.
