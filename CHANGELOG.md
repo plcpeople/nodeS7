@@ -1,3 +1,7 @@
+Version: 0.3.10
+------------
+- Fixes for sequence number collisions (thanks to gfcittolin)
+
 Version: 0.3.9
 ------------
 - Fixes for connection reset in cases where enough data was being read that more polls were required than could run in parallel
