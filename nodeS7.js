@@ -1846,7 +1846,7 @@ function readDTL(buffer, offset, isUTC) {
 	let hour = buffer.readUInt8(offset + 5);
 	let min = buffer.readUInt8(offset + 6);
 	let sec = buffer.readUInt8(offset + 7);
-	let ns = buffer.readUInt8(offset + 8);
+	let ns = buffer.readUInt32BE(offset + 8);
 
 	let date;
 	if (isUTC) {
