@@ -139,6 +139,10 @@ describe('NodeS7 Address Parser', () => {
     decodeAddress('DB6,DT32.2', 'DB', 'DT', 8, 32, 0, 2, 6, R_BYTE, W_BYTE, A_DB, 16, 16);
     decodeAddress('DB6,DTZ72', 'DB', 'DTZ', 8, 72, 0, 1, 6, R_BYTE, W_BYTE, A_DB, 8, 8);
     decodeAddress('DB6,DTZ32.2', 'DB', 'DTZ', 8, 32, 0, 2, 6, R_BYTE, W_BYTE, A_DB, 16, 16);
+    decodeAddress('DB11,DTL74', 'DB', 'DTL', 12, 74, 0, 1, 11, R_BYTE, W_BYTE, A_DB, 12, 12);
+    decodeAddress('DB11,DTL34.2', 'DB', 'DTL', 12, 34, 0, 2, 11, R_BYTE, W_BYTE, A_DB, 24, 24);
+    decodeAddress('DB11,DTLZ74', 'DB', 'DTLZ', 12, 74, 0, 1, 11, R_BYTE, W_BYTE, A_DB, 12, 12);
+    decodeAddress('DB11,DTLZ34.2', 'DB', 'DTLZ', 12, 34, 0, 2, 11, R_BYTE, W_BYTE, A_DB, 24, 24);
 
     // Flags
     decodeAddress('MC0', 'M', 'CHAR', 1, 0, 0, 1, undefined, R_BYTE, W_BYTE, A_FLAGS, 1, 1);

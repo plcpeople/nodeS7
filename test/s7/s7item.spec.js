@@ -88,7 +88,7 @@ describe('S7Item', () => {
         let req = item.getReadItemRequest();
         let res = {
             returnCode: constants.proto.retval.DATA_OK,
-            data: Buffer.from('1911121902167093', 'hex')
+            data: Buffer.from('1911121802167093', 'hex')
         };
         item.readValueFromResponse(res, req);
         item.updateValueFromBuffer();
@@ -106,6 +106,32 @@ describe('S7Item', () => {
         item.readValueFromResponse(res, req);
         item.updateValueFromBuffer();
         expect(item.value.toISOString()).to.be.equal('2019-11-12T21:02:16.709Z');
+        done();
+    });
+
+    it('should read the value of item DB1,DTL0', done => {
+        let item = new S7Item("Item", "DB1,DTL0");
+        let req = item.getReadItemRequest();
+        let res = {
+            returnCode: constants.proto.retval.DATA_OK,
+            data: Buffer.from('07e4031803132c172af99640', 'hex')
+        };
+        item.readValueFromResponse(res, req);
+        item.updateValueFromBuffer();
+        expect(item.value.toISOString()).to.be.equal('2020-03-24T22:44:23.721Z');
+        done();
+    });
+
+    it('should read the value of item DB1,DTLZ0', done => {
+        let item = new S7Item("Item", "DB1,DTLZ0");
+        let req = item.getReadItemRequest();
+        let res = {
+            returnCode: constants.proto.retval.DATA_OK,
+            data: Buffer.from('07e4031803162c172af99640', 'hex')
+        };
+        item.readValueFromResponse(res, req);
+        item.updateValueFromBuffer();
+        expect(item.value.toISOString()).to.be.equal('2020-03-24T22:44:23.721Z');
         done();
     });
 
@@ -171,8 +197,11 @@ describe('S7Item', () => {
     testWriteData('DB66,S2.3', '', '0300000000');
     testWriteData('QR0.3', [0, 1234.5, 3], '00000000449a500040400000');
 
-    testWriteData('DB1,DT0', new Date('2019-11-12T21:02:16.709Z'), '1911121902167093');
+    testWriteData('DB1,DT0', new Date('2019-11-12T21:02:16.709Z'), '1911121802167093');
     testWriteData('DB1,DTZ0', new Date('2019-11-12T21:02:16.709Z'), '1911122102167093');
     testWriteData('DB1,DTZ1', 1573596766876, '1911122212468763');
+    testWriteData('DB1,DTL0', new Date('2020-03-24T22:44:23.721Z'), '07e4031803132c172af99640');
+    testWriteData('DB1,DTLZ0', new Date('2020-03-24T22:44:23.721Z'), '07e4031803162c172af99640');
+    testWriteData('DB1,DTLZ1', 1585089863721, '07e4031803162c172af99640');
 
 });
