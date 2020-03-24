@@ -1775,6 +1775,123 @@ function writePostProcess(theItem) {
 	}
 }
 
+function fromBCD(n) {
+	return ((n >> 4) * 10) + (n & 0xf)
+}
+
+function toBCD(n) {
+	return ((n / 10) << 4) | (n % 10)
+}
+
+function readDT(buffer, offset, isUTC) {
+	let year = fromBCD(buffer.readUInt8(offset));
+	let month = fromBCD(buffer.readUInt8(offset + 1));
+	let day = fromBCD(buffer.readUInt8(offset + 2));
+	let hour = fromBCD(buffer.readUInt8(offset + 3));
+	let min = fromBCD(buffer.readUInt8(offset + 4));
+	let sec = fromBCD(buffer.readUInt8(offset + 5));
+	let ms_1 = fromBCD(buffer.readUInt8(offset + 6));
+	let ms_2 = fromBCD(buffer.readUInt8(offset + 7) & 0xf0);
+
+	let date;
+	if (isUTC) {
+		date = new Date(Date.UTC((year > 89 ? 1900 : 2000) + year, month - 1,
+			day, hour, min, sec, (ms_1 * 10) + (ms_2 / 10)))
+	} else {
+		date = new Date((year > 89 ? 1900 : 2000) + year, month - 1,
+			day, hour, min, sec, (ms_1 * 10) + (ms_2 / 10));
+	}
+
+	return date;
+}
+
+function writeDT(date, buffer, offset, isUTC){
+	if (!(date instanceof Date)) {
+		if (date > 631152000000 && date < 3786911999999) {
+			// is between "1990-01-01T00:00:00.000Z" and "2089-12-31T23:59:59.999Z" in JS epoch
+			// as per data type's range definition
+			date = new Date(date);
+		} else {
+			outputLog("Unsupported value of [" + date + "] for writing data of type DATE_AND_TIME. Skipping item");
+			return;
+		}
+	}
+
+	if (isUTC) {
+		buffer.writeUInt8(toBCD(date.getUTCFullYear() % 100), offset);
+		buffer.writeUInt8(toBCD(date.getUTCMonth() + 1), offset + 1);
+		buffer.writeUInt8(toBCD(date.getUTCDate()), offset + 2);
+		buffer.writeUInt8(toBCD(date.getUTCHours()), offset + 3);
+		buffer.writeUInt8(toBCD(date.getUTCMinutes()), offset + 4);
+		buffer.writeUInt8(toBCD(date.getUTCSeconds()), offset + 5);
+		buffer.writeUInt8(toBCD((date.getUTCMilliseconds() / 10) >> 0), offset + 6);
+		buffer.writeUInt8(toBCD(((date.getUTCMilliseconds() % 10) * 10) + (date.getUTCDay() + 1)), offset + 7);
+	} else {
+		buffer.writeUInt8(toBCD(date.getFullYear() % 100), offset);
+		buffer.writeUInt8(toBCD(date.getMonth() + 1), offset + 1);
+		buffer.writeUInt8(toBCD(date.getDate()), offset + 2);
+		buffer.writeUInt8(toBCD(date.getHours()), offset + 3);
+		buffer.writeUInt8(toBCD(date.getMinutes()), offset + 4);
+		buffer.writeUInt8(toBCD(date.getSeconds()), offset + 5);
+		buffer.writeUInt8(toBCD((date.getMilliseconds() / 10) >> 0), offset + 6);
+		buffer.writeUInt8(toBCD(((date.getMilliseconds() % 10) * 10) + (date.getDay() + 1)), offset + 7);
+	}
+}
+
+function readDTL(buffer, offset, isUTC) {
+	let year = buffer.readUInt16BE(offset);
+	let month = buffer.readUInt8(offset + 2);
+	let day = buffer.readUInt8(offset + 3);
+	//let weekday = buffer.readUInt8(offset + 4);
+	let hour = buffer.readUInt8(offset + 5);
+	let min = buffer.readUInt8(offset + 6);
+	let sec = buffer.readUInt8(offset + 7);
+	let ns = buffer.readUInt8(offset + 8);
+
+	let date;
+	if (isUTC) {
+		date = new Date(Date.UTC(year, month - 1,
+			day, hour, min, sec, ns / 1e6))
+	} else {
+		date = new Date(year, month - 1,
+			day, hour, min, sec, ns / 1e6);
+	}
+
+	return date;
+}
+
+function writeDTL(date, buffer, offset, isUTC) {
+	if (!(date instanceof Date)) {
+		if (date >= 0 && date < 9223382836854) {
+			// is between "1970-01-01T00:00:00.000Z" and "2262-04-11T23:47:16.854Z" in JS epoch
+			// as per data type's range definition
+			date = new Date(date);
+		} else {
+			outputLog("Unsupported value of [" + date + "] for writing data of type DATE_AND_TIME. Skipping item");
+			return;
+		}
+	}
+
+	if (isUTC) {
+		buffer.writeUInt16BE(date.getUTCFullYear(), offset);
+		buffer.writeUInt8(date.getUTCMonth() + 1, offset + 2);
+		buffer.writeUInt8(date.getUTCDate(), offset + 3);
+		buffer.writeUInt8(date.getUTCDay() + 1, offset + 4);
+		buffer.writeUInt8(date.getUTCHours(), offset + 5);
+		buffer.writeUInt8(date.getUTCMinutes(), offset + 6);
+		buffer.writeUInt8(date.getUTCSeconds(), offset + 7);
+		buffer.writeUInt32BE(date.getUTCMilliseconds() * 1e6, offset + 8);
+	} else {
+		buffer.writeUInt16BE(date.getFullYear(), offset);
+		buffer.writeUInt8(date.getMonth() + 1, offset + 2);
+		buffer.writeUInt8(date.getDate(), offset + 3);
+		buffer.writeUInt8(date.getDay() + 1, offset + 4);
+		buffer.writeUInt8(date.getHours(), offset + 5);
+		buffer.writeUInt8(date.getMinutes(), offset + 6);
+		buffer.writeUInt8(date.getSeconds(), offset + 7);
+		buffer.writeUInt32BE(date.getMilliseconds() * 1e6, offset + 8);
+	}
+}
 
 function processS7ReadItem(theItem) {
 
@@ -1810,6 +1927,18 @@ function processS7ReadItem(theItem) {
 				}
 				switch (theItem.datatype) {
 
+					case "DT":
+						theItem.value.push(readDT(theItem.byteBuffer, thePointer, false));
+						break;
+					case "DTZ":
+						theItem.value.push(readDT(theItem.byteBuffer, thePointer, true));
+						break;
+					case "DTL":
+						theItem.value.push(readDTL(theItem.byteBuffer, thePointer, false));
+						break;
+					case "DTLZ":
+						theItem.value.push(readDTL(theItem.byteBuffer, thePointer, true));
+						break;
 					case "REAL":
 						theItem.value.push(theItem.byteBuffer.readFloatBE(thePointer));
 						break;
@@ -1887,6 +2016,18 @@ function processS7ReadItem(theItem) {
 			theItem.quality = ('OK');
 			switch (theItem.datatype) {
 
+				case "DT":
+					theItem.value = readDT(theItem.byteBuffer, thePointer, false);
+					break;
+				case "DTZ":
+					theItem.value = readDT(theItem.byteBuffer, thePointer, true);
+					break;
+				case "DTL":
+					theItem.value = readDTL(theItem.byteBuffer, thePointer, false);
+					break;
+				case "DTLZ":
+					theItem.value = readDTL(theItem.byteBuffer, thePointer, true);
+					break;
 				case "REAL":
 					theItem.value = theItem.byteBuffer.readFloatBE(thePointer);
 					break;
@@ -1990,6 +2131,18 @@ function bufferizeS7Item(theItem) {
 		var bitShiftAmount = theItem.bitOffset;
 		for (var arrayIndex = 0; arrayIndex < theItem.arrayLength; arrayIndex++) {
 			switch (theItem.datatype) {
+				case "DT":
+					writeDT(theItem.writeValue[arrayIndex], theItem.writeBuffer, thePointer, false);
+					break;
+				case "DTZ":
+					writeDT(theItem.writeValue[arrayIndex], theItem.writeBuffer, thePointer, true);
+					break;
+				case "DTL":
+					writeDTL(theItem.writeValue[arrayIndex], theItem.writeBuffer, thePointer, false);
+					break;
+				case "DTLZ":
+					writeDTL(theItem.writeValue[arrayIndex], theItem.writeBuffer, thePointer, true);
+					break;
 				case "REAL":
 					theItem.writeBuffer.writeFloatBE(theItem.writeValue[arrayIndex], thePointer);
 					break;
@@ -2068,6 +2221,18 @@ function bufferizeS7Item(theItem) {
 		// Single value.
 		switch (theItem.datatype) {
 
+			case "DT":
+				writeDT(theItem.writeValue, theItem.writeBuffer, thePointer, false);
+				break;
+			case "DTZ":
+				writeDT(theItem.writeValue, theItem.writeBuffer, thePointer, true);
+				break;
+			case "DTL":
+				writeDTL(theItem.writeValue, theItem.writeBuffer, thePointer, false);
+				break;
+			case "DTLZ":
+				writeDTL(theItem.writeValue, theItem.writeBuffer, thePointer, true);
+				break;
 			case "REAL":
 				theItem.writeBuffer.writeFloatBE(theItem.writeValue, thePointer);
 				break;
@@ -2441,8 +2606,14 @@ function stringToS7Addr(addr, useraddr) {
 		theItem.datatype = 'LINT';
 	}
 	switch (theItem.datatype) {
+		case "DTL":
+		case "DTLZ":
+			theItem.dtypelen = 12;
+			break;
 		case "LREAL":
 		case "LINT":
+		case "DT":
+		case "DTZ":
 			theItem.dtypelen = 8;
 			break;
 		case "REAL":
@@ -2603,6 +2774,11 @@ function S7Item() { // Object
 
 	this.badValue = function() {
 		switch (this.datatype) {
+			case "DT":
+			case "DTZ":
+			case "DTL":
+			case "DTLZ":
+				return new Date(NaN);
 			case "REAL":
 			case "LREAL":
 				return 0.0;
