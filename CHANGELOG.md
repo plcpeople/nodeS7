@@ -1,3 +1,8 @@
+Version: 0.3.11
+------------
+- Addition of date and time datatypes (thanks to gfcittolin)
+- Minor documentation improvements
+
 Version: 0.3.10
 ------------
 - Fixes for sequence number collisions (thanks to gfcittolin)

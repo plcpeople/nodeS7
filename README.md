@@ -7,7 +7,7 @@ This software is not affiliated with Siemens in any way, nor am I.  S7-300, S7-4
 
 WARNING
 =======
-This is ALPHA CODE and you need to be aware that WRONG VALUES could be written to WRONG LOCATIONS.  Fully test everything you do.  In situations where writing to a random area of memory within the PLC could cost you money, back up your data and test this really well.  If this could injure someone or worse, consider other software.
+Fully test everything you do.  In situations where writing to a random area of memory within the PLC could cost you money, back up your data and test this really well.  If this could injure someone or worse, consider other software.
 
 Installation
 =======
@@ -28,9 +28,13 @@ Optimization
 
 PLC Support
 =======
-* S7-1200 and S7-1500 CPU access requires access using "Slot 1" and you must disable optimized block access (in TIA portal) for the blocks you are using.  In addition, you must "Enable GET/PUT Access" in the 1500 controller in TIA Portal.  Doing so opens up the controller for other access by other applications as well, so be aware of the security implications of doing this.
+* S7-1200 and S7-1500 CPU access requires access using "Slot 1" and you must disable optimized block access (in TIA portal) for the blocks you are using.  In addition, you must "Enable GET/PUT Access" in the 1200/1500 controller in TIA Portal.  Doing so opens up the controller for other access by other applications as well, so be aware of the security implications of doing this.
 
-* This has been tested only on direct connection to newer PROFINET CPUs and Helmholz NetLINK PRO COMPACT units.  It SHOULD work with any CP that supports TCP as well, but S7-200/400/1200 haven't been tested.  Very old CPUs have not been tested.  S7 routing is not supported.
+* This has been tested on direct connections to newer PROFINET CPUs and Helmholz NetLINK PRO COMPACT and IBH units.  (Note with these gateways you often have to specify the MPI address as the slot number) It is reported to work with other CPU/CP combinations as well, although not all S7-200 datatypes are supported.  S7 routing is not supported.
+
+* Logo 0BA8 PLCs are supported although you should set your local and remote TSAP to match your project, and your addresses have to be specified differently.  DB1,INT0 should get VM0. DB1,INT1118 should get AM1.
+
+* SINAMICS S120 and G120 FW 4.7 and up should work as well, as these drives support direct HMI connection.
 
 Credit to the S7 Wireshark dissector plugin for help understanding why things were not working.
 (http://sourceforge.net/projects/s7commwireshark/)
@@ -150,6 +154,18 @@ If you use it, `translator` should be a function that takes a string as an argum
 - DB10,S20.30 - String at offset 20 with length of 30 (actual array length 32 due to format of String type, length byte will be read/written)
 - DB10,S20.30.3 - Array of 3 strings at offset 20, each with length of 30 (actual array length 32 due to format of String type, length byte will be read/written)
 - DB10,C22.30 - Character array at offset 22 with length of 30 (best to not use this with strings as length byte is ignored)
+- DB10,DT0 - Date and time
+- DB10,DTZ0 - Date and time in UTC
+- DB10,DTL0 - DTL in newer PLCs
+- DB10,DTLZ0 - DTL in newer PLCs in UTC
+
+The DT type is the well-known DATE_AND_TIME type of S7-300/400 PLCs, a 8-byte-wide field with BCD-encoded parts
+
+The DTZ type is the same as the DT, but it expects that the timestamp is in UTC in the PLC (usually NOT the case)
+
+The DTL type is the one seen on newer S7-1200/1500 PLCs, is 12-byte long and encodes the timestamp differently than the older DATE_AND_TIME
+
+The DTLZ type is also the same as the DTL, but expecting the timestamp in UTC in the PLC
 
 In the example above, an object is declared and the `translator` references that object.  It could just as reference a file or database.  In any case, it allows cleaner Javascript code to be written that refers to a name instead of an absolute address.
 
