@@ -20,18 +20,24 @@ class NodeS7 {
         }
 
         let cbDone = false;
-        function doCb(err) {
-            if (cbDone) return;
+        const doCb = (err) => {
+            if (cbDone || typeof cb !== 'function') return;
             cbDone = true;
-            cb(err);
+            if (err) {
+                this._ep.disconnect().then(() => cb(err)).catch(cb);
+            } else {
+                cb(err);
+            }
         }
         this._ep.once('connect', doCb);
-        this._ep.once('error', doCb);
+        this._ep.on('error', doCb);
     }
 
     dropConnection(cb) {
         if(!this._ep) {
-            process.nextTick(() => cb());
+            if (typeof cb === 'function'){
+                process.nextTick(() => cb());
+            }
             return;
         }
 
