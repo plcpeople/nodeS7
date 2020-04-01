@@ -206,6 +206,7 @@ class S7Endpoint extends EventEmitter {
         debug("S7Endpoint _destroyConnection");
 
         this._connectionState = CONN_DISCONNECTED;
+        clearTimeout(this._reconnectTimer); //ensure we're not trying again if skipReconnect=true
 
         if (!this._connection) return;
 
