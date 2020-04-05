@@ -31,7 +31,7 @@ const debug = util.debuglog('nodes7');
 const PTR_HDR_PARAM_LEN = 6;
 const PTR_HDR_DATA_LEN = 8;
 
-function serializeParamItems(buf, items, ptr){
+function serializeParamItems(buf, items, ptr) {
     buf.writeUInt8(items.length, ptr++);
     for (let i = 0; i < items.length; i++) {
         let elm = items[i];
@@ -66,7 +66,7 @@ function serializeDataItems(buf, items, ptr) {
         ptr += 2;
         elm.data.copy(buf, ptr);
         ptr += elm.data.length;
-        if ((elm.data.length % 2) && (i < items.length - 1)){
+        if ((elm.data.length % 2) && (i < items.length - 1)) {
             //pad even data fields
             ptr += 1;
         }
@@ -90,7 +90,7 @@ class S7Serializer extends Transform {
         debug("S7Serializer _transform");
 
         this.serialize(chunk, (err, data) => {
-            if(err) {
+            if (err) {
                 cb(err);
             } else {
                 this.push(data);
@@ -112,13 +112,13 @@ class S7Serializer extends Transform {
                 if (chunk.param.item && !chunk.param.items) {
                     chunk.param.items = [item];
                 }
-                
+
                 parameterLength = 2 + (chunk.param.items.length * 12);
                 if (chunk.param.function == constants.proto.function.WRITE_VAR) {
-                    for(let i = 0; i < chunk.data.items.length; i++){
+                    for (let i = 0; i < chunk.data.items.length; i++) {
                         let e = chunk.data.items[i]
                         dataLength += 4 + e.data.length;
-                        if ((e.data.length % 2) && (i < chunk.data.items.length)){
+                        if ((e.data.length % 2) && (i < chunk.data.items.length)) {
                             // padding if data is even, but not the last one
                             dataLength += 1;
                         }
@@ -179,7 +179,7 @@ class S7Serializer extends Transform {
             case constants.proto.function.COMM_SETUP:
                 parameterLength = 8;
                 buf = Buffer.alloc(10 + parameterLength + dataLength);
-                
+
                 buf.writeUInt16BE(chunk.param.maxJobsCalling, 12);
                 buf.writeUInt16BE(chunk.param.maxJobsCalled, 14);
                 buf.writeUInt16BE(chunk.param.pduLength, 16);
@@ -209,10 +209,10 @@ class S7Serializer extends Transform {
                 if (chunk.data.item && !chunk.data.items) {
                     chunk.data.items = [item];
                 }
-                
+
                 parameterLength = 2;
                 if (chunk.param.function == constants.proto.function.READ_VAR) {
-                    for(let i = 0; i < chunk.data.items.length; i++){
+                    for (let i = 0; i < chunk.data.items.length; i++) {
                         let e = chunk.data.items[i];
                         dataLength += 4 + e.data.length;
                         if ((e.data.length % 2) && (i < chunk.data.items.length - 1)) {
@@ -270,7 +270,7 @@ class S7Serializer extends Transform {
             case constants.proto.function.COMM_SETUP:
                 parameterLength = 8;
                 buf = Buffer.alloc(12 + parameterLength + dataLength);
-                
+
                 buf.writeUInt16BE(chunk.param.maxJobsCalling, 14);
                 buf.writeUInt16BE(chunk.param.maxJobsCalled, 16);
                 buf.writeUInt16BE(chunk.param.pduLength, 18);
@@ -288,8 +288,57 @@ class S7Serializer extends Transform {
     }
 
     _serializeUserData(chunk) {
-        //TODO
-        return new Error(`Serialization of UserData Telegrams not supported`);
+        debug("S7Serializer _serializeResponse");
+        let buf;
+
+        if (chunk.param.method !== constants.proto.userData.method.REQUEST
+            && chunk.param.method !== constants.proto.userData.method.RESPONSE) {
+                return new Error(`Unknown userData method [${chunk.param.method}]`);
+        }
+
+        let isResMethod = chunk.param.method === constants.proto.userData.method.RESPONSE;
+        let typeFunction = ((chunk.param.type & 0x0f) << 4) | (chunk.param.function & 0x0f)
+        let payload = chunk.data.payload;
+
+        let parameterLength = isResMethod ? 12 : 8;
+        let dataLength = (payload && payload.length || 0) + 4;
+
+        buf = Buffer.alloc(10 + parameterLength + dataLength);
+
+        // parameter section
+
+        buf.writeUIntBE(0x000112, 10, 3); //userData header
+        buf.writeUInt8(isResMethod ? 8 : 4, 13); //param length
+        buf.writeUInt8(chunk.param.method, 14);
+        buf.writeUInt8(typeFunction, 15);
+        buf.writeUInt8(chunk.param.subfunction, 16);
+        buf.writeUInt8(chunk.param.sequenceNumber || 0, 17);
+
+        let ptr = 18;
+        if (isResMethod) {
+            buf.writeUInt8(chunk.param.dataUnitReference || 0, ptr++);
+            buf.writeUInt8(chunk.param.hasMoreData ? 1 : 0, ptr++);
+            buf.writeUInt16BE(chunk.param.errorCode || 0, ptr);
+            ptr += 2;
+        }
+
+        // data section
+
+        buf.writeUInt8(chunk.data.returnCode || 0, ptr++);
+        buf.writeUInt8(chunk.data.transportSize || 0, ptr++);
+        buf.writeUInt16BE(payload && payload.length || 0, ptr);
+        ptr += 2;
+
+        if (payload) {
+            payload.copy(buf, ptr);
+        }
+
+        // header lengths
+
+        buf.writeUInt16BE(parameterLength, PTR_HDR_PARAM_LEN);
+        buf.writeUInt16BE(dataLength, PTR_HDR_DATA_LEN);
+
+        return buf;
     }
 
     serialize(chunk, cb) {
@@ -304,7 +353,7 @@ class S7Serializer extends Transform {
         }
 
         //check if we have a valid header type, and set its length (used if we don't have parameters/data)
-        switch (chunk.header.type){
+        switch (chunk.header.type) {
             case constants.proto.type.REQUEST:
                 headerLength = 10;
                 break;
@@ -321,7 +370,7 @@ class S7Serializer extends Transform {
         }
 
         //delegate buffer creation if we have parameters
-        if (chunk.param){
+        if (chunk.param) {
             switch (chunk.header.type) {
                 case constants.proto.type.REQUEST:
                     buf = this._serializeRequest(chunk);

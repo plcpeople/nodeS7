@@ -131,6 +131,10 @@
             }
         },
         "userData": {
+            "method": {
+                "REQUEST": 17,
+                "RESPONSE": 18
+            },
             "type": {
                 "PUSH": 0,
                 "REQUEST": 4,

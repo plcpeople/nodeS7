@@ -195,8 +195,13 @@ class S7Parser extends Transform {
 
         let obj = {}, offsetStart = offset;
 
-        obj.head = chunk.readUIntBE(offset, 3);
+        let head = chunk.readUIntBE(offset, 3);
         offset += 3;
+
+        if (head !== 0x000112){
+            return new Error(`Unknown header value [0x${head.toString(16)}] != 0x000112`);
+        }
+
         let paramLength = chunk.readUInt8(offset);
         offset += 1;
         obj.method = chunk.readUInt8(offset);
@@ -212,16 +217,11 @@ class S7Parser extends Transform {
         if(paramLength == 8){
             obj.dataUnitReference = chunk.readUInt8(offset);
             offset += 1;
-            obj.lastDataUnit = !(chunk.readUInt8(offset));
+            obj.hasMoreData = !!(chunk.readUInt8(offset));
             offset += 1;
             obj.errorCode = chunk.readUInt16BE(offset);
             offset += 2;
         }
-
-        //some helpers
-        obj.isRequest = obj.type === constants.proto.userData.type.REQUEST;
-        obj.isResponse = obj.type === constants.proto.userData.type.RESPONSE;
-        obj.isPush = obj.type === constants.proto.userData.type.PUSH;
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area

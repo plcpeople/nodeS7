@@ -908,18 +908,6 @@ describe('S7Protocol Serializer', () => {
         });
     });
 
-    /*
-    it('should encode a ', (done) => {
-        let serializer = new S7Serializer();
-        serializer.on('data', (data) => {
-            expect(data.toString('hex')).to.be.equal('');
-            done();
-        });
-
-        serializer.write();
-    });
-    //*/
-
     it('should throw if object has no type', (done) => {
         let serializer = new S7Serializer();
         serializer.on('error', (err) => {
@@ -932,6 +920,126 @@ describe('S7Protocol Serializer', () => {
                 //type: constants.proto.type.REQUEST,
                 rid: 0,
                 pduReference: 0,
+            }
+        });
+    });
+
+    it('should encode a UserData method = Request', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            expect(data.toString('hex')).to.be.equal('320700005400000800060001120411430200ff0900023044');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.USERDATA,
+                rid: 0,
+                pduReference: 0x5400
+            },
+            param: {
+                method: constants.proto.userData.method.REQUEST,
+                type: constants.proto.userData.type.REQUEST,
+                function: constants.proto.userData.function.BLOCK_FUNC,
+                subfunction: constants.proto.userData.subfunction.BLOCK_FUNC.TYPE,
+                sequenceNumber: 0
+            },
+            data: {
+                returnCode: constants.proto.retval.DATA_OK,
+                transportSize: constants.proto.dataTransport.BSTR,
+                payload: Buffer.from('3044', 'hex')
+            }
+        });
+    });
+
+    it('should encode a UserData method = Response and type = Request', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            expect(data.toString('hex')).to.be.equal('320700005500000c00040001120812430201000000000a000000');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.USERDATA,
+                rid: 0,
+                pduReference: 0x5500
+            },
+            param: {
+                method: constants.proto.userData.method.RESPONSE,
+                type: constants.proto.userData.type.REQUEST,
+                function: constants.proto.userData.function.BLOCK_FUNC,
+                subfunction: constants.proto.userData.subfunction.BLOCK_FUNC.TYPE,
+                sequenceNumber: 1,
+                dataUnitReference: 0,
+                hasMoreData: false,
+                errorCode: 0x0000
+            },
+            data: {
+                returnCode: constants.proto.retval.DATA_ERR,
+                transportSize: constants.proto.dataTransport.NULL
+            }
+        });
+    });
+
+    it('should encode a UserData method = Response', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            expect(data.toString('hex')).to.be.equal('320700005200000c0014000112081283020100000000ff090010000122050031221d0032221d007f2205');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.USERDATA,
+                rid: 0,
+                pduReference: 0x5200
+            },
+            param: {
+                method: constants.proto.userData.method.RESPONSE,
+                type: constants.proto.userData.type.RESPONSE,
+                function: constants.proto.userData.function.BLOCK_FUNC,
+                subfunction: constants.proto.userData.subfunction.BLOCK_FUNC.TYPE,
+                sequenceNumber: 1,
+                dataUnitReference: 0,
+                hasMoreData: false,
+                errorCode: 0x0000
+            },
+            data: {
+                returnCode: constants.proto.retval.DATA_OK,
+                transportSize: constants.proto.dataTransport.BSTR,
+                payload: Buffer.from('000122050031221d0032221d007f2205', 'hex')
+            }
+        });
+    });
+
+    it('should encode a UserData method = Response with hasMoreData', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            expect(data.toString('hex')).to.be.equal('320700005400000c00d4000112081283020165010000ff0900d00000420100014201000242010003420100044201000542010006420100074201000b4201000c4201000d4201000e4201000f42010011420100124201001342010014420100154201001642010017420100184201001c4201001d4201001e4201001f4201002042010021420100224201002442010025420100264201002742010028420100294201002a4201002b4201002c4201002e4201002f42010031420100324201003342010034420100664201003742010038420100394201003a4201003b4201004042010041420100424201');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.USERDATA,
+                rid: 0,
+                pduReference: 0x5400
+            },
+            param: {
+                method: constants.proto.userData.method.RESPONSE,
+                type: constants.proto.userData.type.RESPONSE,
+                function: constants.proto.userData.function.BLOCK_FUNC,
+                subfunction: constants.proto.userData.subfunction.BLOCK_FUNC.TYPE,
+                sequenceNumber: 1,
+                dataUnitReference: 101,
+                hasMoreData: true,
+                errorCode: 0x0000
+            },
+            data: {
+                returnCode: constants.proto.retval.DATA_OK,
+                transportSize: constants.proto.dataTransport.BSTR,
+                payload: Buffer.from('0000420100014201000242010003420100044201000542010006420100074201000b4201000c4201000d4201000e4201000f42010011420100124201001342010014420100154201001642010017420100184201001c4201001d4201001e4201001f4201002042010021420100224201002442010025420100264201002742010028420100294201002a4201002b4201002c4201002e4201002f42010031420100324201003342010034420100664201003742010038420100394201003a4201003b4201004042010041420100424201', 'hex')
             }
         });
     });
