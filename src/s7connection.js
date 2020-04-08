@@ -111,7 +111,7 @@ class S7Connection extends EventEmitter {
         this.emit('error', e);
         this.destroy(); //abort connection if we can't understand what we're receiving
     }
-    
+
     _onSerializerError(e) {
         debug('S7Connection _onSerializerError', e);
         this.emit('error', e);
@@ -192,7 +192,7 @@ class S7Connection extends EventEmitter {
         /**
          * Emitted on all incoming packets from the PLC that
          * are NOT response of a request in the queue
-         * @event S7Connection#timeout
+         * @event S7Connection#message
          * @param {object} data The job's payload, if available
          */
         this.emit('message', data);
@@ -303,7 +303,7 @@ class S7Connection extends EventEmitter {
     destroy() {
         debug('S7Connection disconnect');
 
-        if(this._connectionState == CONN_DISCONNECTED) return;
+        if (this._connectionState == CONN_DISCONNECTED) return;
 
         this._connectionState = CONN_DISCONNECTED;
 
@@ -313,11 +313,11 @@ class S7Connection extends EventEmitter {
         });
         this._jobInProcess.clear();
 
-        function destroySafe(stream){
+        function destroySafe(stream) {
             //handles older NodeJS versions
-            if(stream.destroy){
+            if (stream.destroy) {
                 stream.destroy();
-            } else if (stream._destroy){
+            } else if (stream._destroy) {
                 stream._destroy();
             }
         }
@@ -343,7 +343,7 @@ class S7Connection extends EventEmitter {
                 return;
             }
 
-            if (this._connectionState > CONN_CONNECTED){
+            if (this._connectionState > CONN_CONNECTED) {
                 rej(new Error("Not connected"));
             }
 
@@ -353,6 +353,69 @@ class S7Connection extends EventEmitter {
             });
             this._processQueue();
         });
+    }
+
+    /**
+     * 
+     * @param {number} func the function number
+     * @param {number} subfunc the subfunction number
+     * @param {Buffer} [data] the payload of the userdata call
+     * @param {number} [transport=BSTR] the payload's transport type
+     * @param {number} [method=REQUEST] the initial transport code
+     * @returns {Promise<Buffer>}
+     */
+    async sendUserData(func, subfunc, data, transport = constants.proto.dataTransport.BSTR, method = constants.proto.userData.method.REQUEST) {
+        debug('S7Connection sendUserData', func, subfunc, transport, method);
+
+        let resBufs = [];
+        let seqNum = 0;
+        let resMsg;
+        do {
+            debug('S7Connection sendUserData loop', seqNum);
+
+            let reqMsg = {
+                header: {
+                    type: constants.proto.type.USERDATA
+                },
+                param: {
+                    method: method,
+                    type: constants.proto.userData.type.REQUEST,
+                    function: func,
+                    subfunction: subfunc,
+                    sequenceNumber: seqNum
+                },
+                data: {
+                    returnCode: constants.proto.retval.DATA_ERR,
+                    transportSize: constants.proto.dataTransport.NULL
+                }
+            };
+
+            if (seqNum === 0 && data) { //the first call, with the actual data
+                reqMsg.data = {
+                    returnCode: constants.proto.retval.DATA_OK,
+                    transportSize: transport,
+                    payload: data
+                }
+            }
+
+            seqNum++;
+            // in the case we hasMoreData = true, method needs to be RESPONSE in the next requests
+            method = constants.proto.userData.method.RESPONSE;
+
+            resMsg = await this.sendRaw(reqMsg);
+
+            if (resMsg.param.errorCode != constants.proto.error.OK) {
+                let errDesc = constants.proto.errorCodeDesc[resMsg.param.errorCode] || '<Unknown error code>'
+                throw new Error(`Unexpected error code reply on userdata response [${resMsg.param.errorCode}]: "${errDesc}"`);
+            }
+
+            resBufs.push(resMsg.data.payload);
+
+        } while (resMsg.param.hasMoreData);
+
+        let res = Buffer.concat(resBufs);
+        debug('S7Connection sendUserData res', res);
+        return res;
     }
 
     /**
@@ -368,6 +431,284 @@ class S7Connection extends EventEmitter {
             job.rej(new Error("Job interrupted"));
         }
     }
+
+    // ------ data exchange methods ------
+
+    /**
+     * Sends a REQUEST telegram with READ_VAR funtction
+     * @param {object[]} items 
+     * @returns {Promise<object[]>}
+     */
+    requestReadVars(items) {
+        debug('S7Connection requestReadVars', items && items.length);
+
+        return this.sendRaw({
+            header: {
+                type: constants.proto.type.REQUEST
+            },
+            param: {
+                function: constants.proto.function.READ_VAR,
+                items: items
+            }
+        }).then(msg => msg.data.items);
+    }
+
+    /**
+     * Sends a REQUEST telegram with WRITE_VAR function
+     * @param {object[]} items 
+     * @param {object[]} data
+     * @returns {Promise<object[]>}
+     */
+    requestWriteVar(items, data) {
+        debug('S7Connection requestWriteVar', items && items.length, data && data.length);
+
+        return this.sendRaw({
+            header: {
+                type: constants.proto.type.REQUEST
+            },
+            param: {
+                function: constants.proto.function.WRITE_VAR,
+                items: items
+            },
+            data: {
+                items: data
+            }
+        }).then(msg => msg.data.items);
+    }
+
+    /**
+     * @typedef {object} BlockCountResponse
+     * @property {number} [OB] the amount of OBs
+     * @property {number} [DB] the amount of DBs
+     * @property {number} [SDB] the amount of SDBs
+     * @property {number} [FC] the amount of FCs
+     * @property {number} [SFC] the amount of SFCs
+     * @property {number} [FB] the amount of FBs
+     * @property {number} [SFB] the amount of SFBs
+     */
+
+    /**
+     * gets a count of blocks from the PLC
+     * @returns {Promise<BlockCountResponse>} an object with the block type as property key ("DB", "FB", ...) and the count as property value
+     */
+    async blockCount() {
+        debug('S7Connection blockCount');
+
+        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC, 
+            constants.proto.userData.subfunction.BLOCK_FUNC.LIST);
+
+        if (res.length % 4) {
+            throw new Error(`Expecting blockCount response length to be multiple of 4 (got [${res.length}])`);
+        }
+
+        //create search index for block types from constants
+        const blockTypes = constants.proto.block.subtype;
+        /** @type {Map<number,string>} */
+        const blkTypeIdx = new Map();
+        Object.keys(blockTypes).forEach(k => blkTypeIdx.set(blockTypes[k], k));
+
+        let blockCount = {};
+        for (let i = 0; i < res.length; i += 4) {
+            let blkTypeId = parseInt(res.toString('ascii', i, i + 2), 16);
+            let count = res.readUInt16BE(i + 2);
+
+            let blkType = blkTypeIdx.get(blkTypeId);
+            if (!blkType) {
+                throw new Error(`Unknown block type id [${blkTypeId}] on buffer [${res.toString('hex')}]`);
+            }
+
+            blockCount[blkType] = count;
+        }
+
+        return blockCount;
+    }
+
+    /**
+     * @typedef {object} ListBlockResponse
+     * @property {number} number the block number
+     * @property {number} flags
+     * @property {number} lang
+     */
+
+    /**
+     * 
+     * @param {number|string} type the block name in string, or its ID
+     * @returns {Promise<ListBlockResponse[]>}
+     */
+    async listBlocks(type) {
+        debug('S7Connection listBlocks', type);
+
+        let blkTypeId;
+        switch (typeof type) {
+            case 'number':
+                if (isNaN(type) || type < 0 || type > 255) {
+                    throw new Error(`Invalid parameter for block type [${type}]`);
+                }
+                blkTypeId = type;
+                break;
+            case 'string':
+                blkTypeId = constants.proto.block.subtype[type.toUpperCase()];
+                if (blkTypeId === undefined) {
+                    throw new Error(`Unknown block type [${type}]`);
+                }
+                break;
+            default:
+                throw new Error(`Unknown type for parameter block type [${type}]`);
+        }
+
+        let blkTypeString = blkTypeId.toString(16).padStart(2, '0').toUpperCase();
+        if (blkTypeString.length !== 2) {
+            // act as a safeguard, should never happen
+            throw new Error(`Internal error parsing type [${type}], generated ID [${blkTypeString}]`);
+        }
+
+        let req = Buffer.from(blkTypeString);
+
+        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC, 
+            constants.proto.userData.subfunction.BLOCK_FUNC.TYPE, req);
+
+        if (res.length % 4) {
+            throw new Error(`Expecting listBlocks response length to be multiple of 4 (got [${res.length}])`);
+        }
+
+        let blocks = []
+        for (let i = 0; i < res.length; i += 4) {
+            let number = res.readUInt16BE(i);
+            let flags = res.readUInt8(i + 2);
+            let lang = res.readUInt8(i + 3);
+            blocks.push({number, flags, lang});
+        }
+
+        return blocks;
+    }
+
+    /**
+     * 
+     * @param {string|number} type the block type
+     * @param {number} number the block number
+     * @param {string} [filesystem='A'] the filesystem being queried
+     * @returns {Promise<Buffer>}
+     */
+    async getBlockInfo(type, number, filesystem = "A") {
+        debug('S7Connection listBlocks', type, number, filesystem);
+
+        let blkTypeId;
+        switch (typeof type) {
+            case 'number':
+                if (isNaN(type) || type < 0 || type > 255) {
+                    throw new Error(`Invalid parameter for block type [${type}]`);
+                }
+                blkTypeId = type;
+                break;
+            case 'string':
+                blkTypeId = constants.proto.block.subtype[type.toUpperCase()];
+                if (blkTypeId === undefined) {
+                    throw new Error(`Unknown block type [${type}]`);
+                }
+                break;
+            default:
+                throw new Error(`Unknown type for parameter block type [${type}]`);
+        }
+
+        let blkTypeString = blkTypeId.toString(16).padStart(2, '0').toUpperCase();
+        let blkNumString = number.toString().padStart(5, '0');
+        let filename = blkTypeString + blkNumString + filesystem;
+        
+        if (filename.length !== 8) {
+            throw new Error(`Internal error on generated filename [${filename}]`);
+        }
+
+        let req = Buffer.from(filename);
+
+        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC, 
+            constants.proto.userData.subfunction.BLOCK_FUNC.BLOCKINFO, req);
+
+        return res;
+    }
+
+    /**
+     * Gets the current PLC time
+     * @returns {Promise<Date>}
+     */
+    async getTime() {
+        debug('S7Connection getTime');
+
+        let buffer = await this.sendUserData(constants.proto.userData.function.TIME,
+            constants.proto.userData.subfunction.TIME.READ);
+
+        if (buffer.length !== 10) {
+            throw new Error(`Expecting 10 bytes as response from getTime, got [${buffer.length}]`);
+        }
+
+        let offset = 0;
+        let reserved = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let y1 = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let y2 = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let mon = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let day = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let hr = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let min = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let sec = fromBCD(buffer.readUInt8(offset));
+        offset += 1;
+        let ms = fromBCD(buffer.readUInt16BE(offset) >> 4); //last 4 bits are weekday, we ignore
+        offset += 2;
+
+        //the first byte (y1) seems to be hardcoded to `0x19` 
+        let year = y2 + (y2 > 89 ? 1900 : 2000);
+        let plcDate = new Date(year, mon - 1, day, hr, min, sec, ms);
+
+        debug('S7Connection getTime', plcDate);
+        return plcDate;
+    }
+
+    /**
+     * Gets the current PLC time
+     * @param {Date} date the date/time to be setted
+     * @returns {Promise<void>}
+     */
+    async setTime(date = new Date()) {
+        debug('S7Connection setTime', date);
+
+        let buf = Buffer.alloc(10);
+        buf.writeUInt8(0, 0);
+        buf.writeUInt8(toBCD((date.getFullYear() / 100) >> 0), 1);
+        buf.writeUInt8(toBCD(date.getFullYear() % 100), 2);
+        buf.writeUInt8(toBCD(date.getMonth() + 1), 3);
+        buf.writeUInt8(toBCD(date.getDate()), 4);
+        buf.writeUInt8(toBCD(date.getHours()), 5);
+        buf.writeUInt8(toBCD(date.getMinutes()), 6);
+        buf.writeUInt8(toBCD(date.getSeconds()), 7);
+        buf.writeUInt8(toBCD((date.getMilliseconds() / 10) >> 0), 8);
+        buf.writeUInt8(toBCD(((date.getMilliseconds() % 10) << 4) | (date.getDay() + 1)), 7);
+
+        await this.sendUserData(constants.proto.userData.function.TIME,
+            constants.proto.userData.subfunction.TIME.SET, buf);
+    }
 }
 
 module.exports = S7Connection;
+
+/**
+ * Helper to convert from BCD notation
+ * @private
+ * @param {number} i 
+ */
+function fromBCD(i) {
+    return (100 * (i >> 8)) + (10 * ((i >> 4) & 0x0f)) + (i & 0x0f);
+}
+
+/**
+ * Helper to convert to BCD notation
+ * @private
+ * @param {number} i 
+ */
+function toBCD(i) {
+    return ((i / 10) << 4) | (i % 10);
+}

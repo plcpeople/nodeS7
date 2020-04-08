@@ -457,17 +457,7 @@ class S7Endpoint extends EventEmitter {
             });
         }
 
-        return this._connection.sendRaw({
-            header: {
-                type: constants.proto.type.REQUEST
-            },
-            param: {
-                function: constants.proto.function.READ_VAR,
-                items: arr
-            }
-        }).then(msg => {
-            return msg.data.items;
-        });
+        return await this._connection.requestReadVars(arr);
     }
 
     /**
@@ -530,6 +520,8 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<Buffer>}
      */
     async readDB(db, address, length) {
+        debug('S7Endpoint readDB', db, address, length);
+
         return await this.readArea(constants.proto.area.DB, address, length, db);
     }
 
@@ -541,6 +533,8 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<Buffer>}
      */
     async readInputs(address, length) {
+        debug('S7Endpoint readInputs', address, length);
+
         return await this.readArea(constants.proto.area.INPUTS, address, length);
     }
 
@@ -552,6 +546,8 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<Buffer>}
      */
     async readOutputs(address, length) {
+        debug('S7Endpoint readOutputs', address, length);
+
         return await this.readArea(constants.proto.area.OUTPUTS, address, length);
     }
 
@@ -563,6 +559,8 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<Buffer>}
      */
     async readFlags(address, length) {
+        debug('S7Endpoint readFlags', address, length);
+
         return await this.readArea(constants.proto.area.FLAGS, address, length);
     }
 
@@ -606,21 +604,7 @@ class S7Endpoint extends EventEmitter {
             });
         }
 
-        return this._connection.sendRaw({
-            header: {
-                type: constants.proto.type.REQUEST
-            },
-            param: {
-                function: constants.proto.function.WRITE_VAR,
-                items: param
-            },
-            data: {
-                items: data
-            }
-        }).then(msg => {
-            return msg.data.items;
-        });
-
+        return await this._connection.requestWriteVar(param, data);
     }
 
     /**
@@ -681,18 +665,9 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<void>}
      */
     async writeDB(db, address, data) {
-        return await this.writeArea(constants.proto.area.DB, address, data, db);
-    }
+        debug('S7Endpoint writeDB', db, address, data && data.length);
 
-    /**
-     * Writes data into the inputs area
-     *
-     * @param {number} address the address where to write to
-     * @param {Buffer} data the amount of bytes to write
-     * @returns {Promise<void>}
-     */
-    async writeInputs(address, data) {
-        return await this.writeArea(constants.proto.area.INPUTS, address, data);
+        return await this.writeArea(constants.proto.area.DB, address, data, db);
     }
 
     /**
@@ -703,6 +678,8 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<void>}
      */
     async writeOutputs(address, data) {
+        debug('S7Endpoint writeOutputs', address, data && data.length);
+
         return await this.writeArea(constants.proto.area.OUTPUTS, address, data);
     }
 
@@ -714,9 +691,52 @@ class S7Endpoint extends EventEmitter {
      * @returns {Promise<void>}
      */
     async writeFlags(address, data) {
+        debug('S7Endpoint writeFlags', address, data && data.length);
+
         return await this.writeArea(constants.proto.area.FLAGS, address, data);
     }
 
+    async blockCount() {
+        debug('S7Endpoint blockCount');
+
+        return await this._connection.blockCount();
+    }
+
+    async listBlocks(type) {
+        debug('S7Endpoint listBlocks');
+        
+        return await this._connection.listBlocks(type);
+    }
+
+    async getBlockInfo(type, number, filesystem) {
+        debug('S7Endpoint getBlockInfo');
+
+        return await this._connection.getBlockInfo(type, number, filesystem);
+    }
+
+    async listAllBlocks() {
+        debug('S7Endpoint listAllBlocks');
+
+        let res = {};
+        let types = Object.keys(constants.proto.block.type);
+        for (const type of types) {
+            res[type] = await this.listBlocks(type);
+        }
+
+        return res;
+    }
+
+    async getTime() {
+        debug('S7Endpoint getTime');
+
+        return await this._connection.getTime();
+    }
+
+    async setTime(date) {
+        debug('S7Endpoint setTime', date);
+
+        await this._connection.setTime(date);
+    }
 }
 
 module.exports = S7Endpoint
