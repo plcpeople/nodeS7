@@ -781,6 +781,57 @@ class S7Endpoint extends EventEmitter {
 
         return await this._connection.uploadBlock(filename);
     }
+
+    /**
+     * gets a SystemStatusList specified by its ID and Index
+     * @param {number} [id=0] the SSL ID
+     * @param {number} [index=0] the SSL Index
+     * @param {boolean} [strict=false] Whether it should verify if the requested Ids and indexes match
+     * @returns {Promise<Buffer[]>}
+     */
+    async getSSL(id = 0, index = 0, strict = false) {
+        debug('S7Endpoint getSSL', id, index);
+        
+        let reqBuf = Buffer.alloc(4);
+        reqBuf.writeUInt16BE(id, 0);
+        reqBuf.writeUInt16BE(index, 2);
+
+        let res = await this._connection.sendUserData(constants.proto.userData.function.CPU_FUNC,
+            constants.proto.userData.subfunction.CPU_FUNC.READSZL, reqBuf);
+
+        let resId = res.readUInt16BE(0);
+        let resIdx = res.readUInt16BE(2);
+
+        if (strict && (resId !== id || resIdx !== index)) {
+            throw new Error(`SSL ID/Index mismatch, requested [${id}]/[${index}], got [${resId}]/[${resIdx}]`);
+        }
+
+        let entryLength = res.readUInt16BE(4);
+        let entryCount = res.readUInt16BE(6);
+
+        if (entryLength * entryCount !== res.length - 8){
+            throw new Error(`Size mismatch, expecting [${entryCount}] x [${entryLength}] + 8, got [${res.length}]`);
+        }
+
+        let retArray = [];
+        for (let i = 0; i < entryCount; i++) {
+            const ptr = 8 + (entryLength * i);
+            retArray.push(res.slice(ptr, ptr + entryLength));
+        }
+
+        return retArray;
+    }
+
+    /**
+     * Gets the available SSL IDs by querying SSL ID 0x000, Index 0x0000
+     * @returns {Promise<number[]>}
+     */
+    async getAvailableSSL() {
+        debug('S7Endpoint getAvailableSSL');
+        
+        let res = await this.getSSL(0, 0);
+        return res.map(b => b.readUInt16BE(0));
+    }
 }
 
 module.exports = S7Endpoint
