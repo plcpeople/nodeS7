@@ -370,6 +370,8 @@ class S7Connection extends EventEmitter {
         let resBufs = [];
         let seqNum = 0;
         let resMsg;
+        let first = true;
+
         do {
             debug('S7Connection sendUserData loop', seqNum);
 
@@ -390,7 +392,7 @@ class S7Connection extends EventEmitter {
                 }
             };
 
-            if (seqNum === 0 && data) { //the first call, with the actual data
+            if (first && data) { //the first call, with the actual data
                 reqMsg.data = {
                     returnCode: constants.proto.retval.DATA_OK,
                     transportSize: transport,
@@ -398,9 +400,9 @@ class S7Connection extends EventEmitter {
                 }
             }
 
-            seqNum++;
             // in the case we hasMoreData = true, method needs to be RESPONSE in the next requests
             method = constants.proto.userData.method.RESPONSE;
+            first = false;
 
             resMsg = await this.sendRaw(reqMsg);
 
@@ -409,6 +411,7 @@ class S7Connection extends EventEmitter {
                 throw new Error(`Unexpected error code reply on userdata response [${resMsg.param.errorCode}]: "${errDesc}"`);
             }
 
+            seqNum = resMsg.param.sequenceNumber;
             resBufs.push(resMsg.data.payload);
 
         } while (resMsg.param.hasMoreData);
