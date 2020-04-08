@@ -737,6 +737,50 @@ class S7Endpoint extends EventEmitter {
 
         await this._connection.setTime(date);
     }
+
+    /**
+     * 
+     * @param {string|number} type 
+     * @param {number} number 
+     * @param {boolean} [headerOnly=false] if we should ask for module header (`$`) instead of complete (`_`)
+     * @param {string} [filesystem='A'] the filesystem to query (`A`, `P` or `B`)
+     */
+    async uploadBlock(type, number, headerOnly = false, filesystem = "A") {
+        debug('S7Endpoint uploadBlock', type, number, headerOnly, filesystem);
+
+        let blkTypeId;
+        switch (typeof type) {
+            case 'number':
+                if (isNaN(type) || type < 0 || type > 255) {
+                    throw new Error(`Invalid parameter for block type [${type}]`);
+                }
+                blkTypeId = type;
+                break;
+            case 'string':
+                blkTypeId = constants.proto.block.subtype[type.toUpperCase()];
+                if (blkTypeId === undefined) {
+                    throw new Error(`Unknown block type [${type}]`);
+                }
+                break;
+            default:
+                throw new Error(`Unknown type for parameter block type [${type}]`);
+        }
+
+        if (!['A', 'P', 'B'].includes(filesystem)) {
+            throw new Error(`Unknown filesystem [${filesystem}]`);
+        }
+
+        let fileId = headerOnly ? '$' : '_';
+        let blkTypeString = blkTypeId.toString(16).padStart(2, '0').toUpperCase();
+        let blkNumString = number.toString().padStart(5, '0');
+        let filename = fileId + blkTypeString + blkNumString + filesystem;
+
+        if (filename.length !== 9) {
+            throw new Error(`Internal error on generated filename [${filename}]`);
+        }
+
+        return await this._connection.uploadBlock(filename);
+    }
 }
 
 module.exports = S7Endpoint

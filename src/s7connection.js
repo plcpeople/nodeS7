@@ -691,6 +691,114 @@ class S7Connection extends EventEmitter {
         await this.sendUserData(constants.proto.userData.function.TIME,
             constants.proto.userData.subfunction.TIME.SET, buf);
     }
+
+    /**
+     * Requests the upload of a block
+     * @param {string} filename the filename of the block to be uploaded
+     * @returns {Promise<Buffer>} the block's content
+     */
+    async uploadBlock(filename) {
+        debug('S7Connection uploadBlock', filename);
+
+        let blockParts = [];
+
+        let upStartRes = await this.sendRaw({
+            header: {
+                type: constants.proto.type.REQUEST
+            },
+            param: {
+                function: constants.proto.function.UPLOAD_START,
+                status: 0,
+                uploadID: 0,
+                filename: filename
+            }
+        });
+
+        if (upStartRes.param.status !== 0){
+            throw new Error(`Unexpected status [${upStartRes.param.status}] != 0 on uploadStart`);
+        }
+
+        let uploadId = upStartRes.param.uploadID;
+        let blockLen = parseInt(upStartRes.param.blockLength);
+
+        debug('S7Connection uploadBlock uploadStart-res', uploadId, blockLen);
+
+        /* Surround the process ina try-catch block, so we can properly cleanup
+           the process with an UPLOAD_END */
+        try {
+
+            if (isNaN(blockLen)) {
+                throw new Error(`Unexpected value for total block length [${upStartRes.param.blockLength}] on uploadStart`);
+            }
+
+            let upRes, upResErr, upResMoreData;
+            do {
+                upRes = await this.sendRaw({
+                    header: {
+                        type: constants.proto.type.REQUEST
+                    },
+                    param: {
+                        function: constants.proto.function.UPLOAD_BLOCK,
+                        status: 0,
+                        uploadID: uploadId
+                    }
+                });
+                
+                upResMoreData = upRes.param.status & 0x01;
+                upResErr = upRes.param.status & 0x02;
+                let payload = upRes.data.payload;
+
+                debug('S7Connection uploadBlock upload-res', upRes.param.status, payload && payload.length);
+                
+                if (upResErr) {
+                    throw new Error(`Unexpected error status [${upRes.param.status}] on upload`);
+                }
+                
+                blockParts.push(payload);
+
+            } while (upResMoreData);
+
+        } catch (e) {
+            debug('S7Connection uploadBlock catch', e);
+
+            // release resources on the PLC by sending UPLOAD_END...
+            await this.sendRaw({
+                header: {
+                    type: constants.proto.type.REQUEST
+                },
+                param: {
+                    function: constants.proto.function.UPLOAD_END,
+                    status: 0,
+                    errorCode: 0xFFFF,
+                    uploadID: uploadId
+                }
+            });
+
+            // ... and then throw original error
+            throw e;
+        }
+
+        debug('S7Connection uploadBlock uploadEnd');
+
+        await this.sendRaw({
+            header: {
+                type: constants.proto.type.REQUEST
+            },
+            param: {
+                function: constants.proto.function.UPLOAD_END,
+                status: 0,
+                errorCode: 0,
+                uploadID: uploadId
+            }
+        });
+
+        let res = Buffer.concat(blockParts);
+        if (res.length !== blockLen) {
+            throw new Error(`Size mismatch between informed length [${blockLen}] and received data [${res.length}]`);
+        }
+
+        return res;
+    }
 }
 
 module.exports = S7Connection;
