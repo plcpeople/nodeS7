@@ -288,7 +288,7 @@ class S7Serializer extends Transform {
     }
 
     _serializeUserData(chunk) {
-        debug("S7Serializer _serializeResponse");
+        debug("S7Serializer _serializeUserData");
         let buf;
 
         if (chunk.param.method !== constants.proto.userData.method.REQUEST
@@ -406,6 +406,8 @@ class S7Serializer extends Transform {
             buf.writeUInt8(Number(chunk.header.errorCode) || 0, 11);
         }
 
+
+        debug("S7Serializer serialize", buf);
         cb(null, buf);
     }
 }
