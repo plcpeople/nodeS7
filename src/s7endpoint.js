@@ -205,10 +205,10 @@ class S7Endpoint extends EventEmitter {
     _destroyConnection(skipReconnect) {
         debug("S7Endpoint _destroyConnection");
 
+        if (!this._connection) return;
+
         this._connectionState = CONN_DISCONNECTED;
         clearTimeout(this._reconnectTimer); //ensure we're not trying again if skipReconnect=true
-
-        if (!this._connection) return;
 
         this._connection.destroy();
         if (!skipReconnect) this._scheduleReconnection();
@@ -400,6 +400,7 @@ class S7Endpoint extends EventEmitter {
 
         return new Promise((res, rej) => {
             if (this._connectionState === CONN_DISCONNECTED) {
+                clearTimeout(this._reconnectTimer);
                 res();
             } else {
                 this.once('disconnect', res);
