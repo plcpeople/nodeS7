@@ -104,11 +104,11 @@ class S7Item extends EventEmitter {
     }
 
     /**
-     * @private
      * Calculates the buffer offsets to be used in Buffer.copy()
      * that are the memory area intersection between the memory
      * area of this item and the given one
-     * 
+     *
+     * @private
      * @param {number} address 
      * @param {number} length 
      * @returns an object with targetStart, sourceStart, and sourceEnd, 
@@ -136,9 +136,9 @@ class S7Item extends EventEmitter {
     }
 
     /**
-     * @private
      * Updates the internal buffer with provided data
-     * 
+     *
+     * @private
      * @param {Buffer} buffer the buffer containing the data
      * @param {object} offsets offsets object, as returned from _getCopyBufferOffsets()
      * @param {number} offsets.targetStart offset to this item

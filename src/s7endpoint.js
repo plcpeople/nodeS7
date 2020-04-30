@@ -36,6 +36,42 @@ const CONN_CONNECTING = 1;
 const CONN_CONNECTED = 2;
 const CONN_DISCONNECTING = 3;
 
+/** @typedef {S7Connection.BlockCountResponse} BlockCountResponse */
+/** @typedef {S7Connection.ListBlockResponse} ListBlockResponse */
+/**
+ * @typedef {object} BlockList
+ * @property {ListBlockResponse[]} OB list of blocks of type OB
+ * @property {ListBlockResponse[]} DB list of blocks of type DB
+ * @property {ListBlockResponse[]} SDB list of blocks of type SDB
+ * @property {ListBlockResponse[]} FC list of blocks of type FC
+ * @property {ListBlockResponse[]} SFC list of blocks of type SFC
+ * @property {ListBlockResponse[]} FB list of blocks of type FB
+ * @property {ListBlockResponse[]} SFB list of blocks of type SFB
+ */
+/**
+ * @typedef {object} ModuleInformation
+ * @property {string} [moduleOrderNumber]
+ * @property {string} [hardwareOrderNumber]
+ * @property {string} [firmwareOrderNumber]
+ */
+/**
+ * @typedef {object} ComponentIdentification
+ * @property {string} [systemName] W#16#0001: Name of the automation system
+ * @property {string} [moduleName] W#16#0002: Name of the module
+ * @property {string} [plantName] W#16#0003: Plant designation of the module
+ * @property {string} [copyright] W#16#0004: Copyright entry
+ * @property {string} [serialNumber] W#16#0005: Serial number of the module
+ * @property {string} [partType] W#16#0007: Module type name
+ * @property {string} [mmcSerialNumber] W#16#0008: Serial number of the memory card
+ * @property {number} [vendorId] W#16#0009: Manufacturer and profile of a CPU module - Vendor ID
+ * @property {number} [profileId] W#16#0009: Manufacturer and profile of a CPU module - Profile ID
+ * @property {number} [profileSpecific] W#16#0009: Manufacturer and profile of a CPU module - Profile-specific Id
+ * @property {string} [oemString] W#16#000A: OEM ID of a module (S7-300 only)
+ * @property {number} [oemId] W#16#000A: OEM ID of a module (S7-300 only)
+ * @property {number} [oemAdditionalId] W#16#000A: OEM ID of a module (S7-300 only)
+ * @property {string} [location] W#16#000B: Location ID of a module
+ */
+
 /**
  * Emitted when an error occurs with the underlying
  * transport or the underlying connection
@@ -135,6 +171,10 @@ class S7Endpoint extends EventEmitter {
         }
     }
 
+    /**
+     * Initialize internal variables
+     * @private
+     */
     _initParams() {
         this._connectionState = CONN_DISCONNECTED;
         this._connection = null;
@@ -143,6 +183,11 @@ class S7Endpoint extends EventEmitter {
         this._reconnectTimer = null;
     }
 
+    /**
+     * Initiates the connection process according to the 
+     * selected transport type
+     * @private
+     */
     _connect() {
         debug("S7Endpoint _connect");
 
@@ -182,6 +227,11 @@ class S7Endpoint extends EventEmitter {
         }
     }
 
+    /**
+     * Creates the S7Connection that will handle the communication
+     * with the PLC through the "this._transport" socket
+     * @private
+     */
     _connectS7() {
         debug("S7Endpoint _connectS7");
 
@@ -277,12 +327,20 @@ class S7Endpoint extends EventEmitter {
 
     }
 
+    /**
+     * Handles transport's "close" events
+     * @private
+     */
     _onTransportClose() {
         debug("S7Endpoint _onTransportClose");
 
         this._destroyTransport();
     }
 
+    /**
+     * Handles transport's "end" events
+     * @private
+     */
     _onTransportEnd() {
         debug("S7Endpoint _onTransportEnd");
 
@@ -302,6 +360,11 @@ class S7Endpoint extends EventEmitter {
         this._disconnect();
     }
 
+    /**
+     * Handles transport's "error" events
+     * @private
+     * @param {Error} e 
+     */
     _onTransportError(e) {
         debug("S7Endpoint _onTransportError", e);
 
@@ -310,6 +373,11 @@ class S7Endpoint extends EventEmitter {
         this.emit('error', e);
     }
 
+    /**
+     * Handles connection's "error" events
+     * @private
+     * @param {Error} e 
+     */
     _onConnectionError(e) {
         debug("S7Endpoint _onConnectionError", e);
 
@@ -319,6 +387,11 @@ class S7Endpoint extends EventEmitter {
         this.emit('error', e);
     }
 
+    /**
+     * Handles MPIAdapter's "error" events
+     * @private
+     * @param {Error} e 
+     */
     _onMpiAdapterError(e) {
         debug("S7Endpoint _onMpiAdapterError", e);
 
@@ -346,6 +419,10 @@ class S7Endpoint extends EventEmitter {
         }
     }
 
+    /**
+     * Triggered when the connection is established
+     * @private
+     */
     _onConnectionConnected() {
         debug("S7Endpoint _onConnectionConnected");
 
@@ -374,6 +451,7 @@ class S7Endpoint extends EventEmitter {
      * Connects to the PLC. Note that this will be automatically
      * called if the autoReconnect parameter of the constructor 
      * is not zero.
+     * @returns {Promise<void>}
      */
     connect() {
         debug("S7Endpoint connect");
@@ -394,6 +472,7 @@ class S7Endpoint extends EventEmitter {
 
     /**
      * Disconnects from the PLC. 
+     * @returns {Promise<void>}
      */
     disconnect() {
         debug("S7Endpoint disconnect");
@@ -412,6 +491,7 @@ class S7Endpoint extends EventEmitter {
 
     /**
      * Whether we're currently connected to the PLC or not
+     * @returns {boolean}
      */
     get isConnected() {
         return this._connectionState === CONN_CONNECTED;
@@ -419,6 +499,7 @@ class S7Endpoint extends EventEmitter {
 
     /**
      * The currently negotiated pdu size
+     * @returns {number}
      */
     get pduSize() {
         return this._pduSize;
@@ -436,6 +517,7 @@ class S7Endpoint extends EventEmitter {
      * @param {number} items[].transport the transport length
      * @param {number} items[].address the address where to read from
      * @param {number} items[].length the number of elements to read (according to transport)
+     * @returns {Promise<object>}
      */
     async readVars(items) {
         debug('S7Endpoint readVars', items);
@@ -578,6 +660,7 @@ class S7Endpoint extends EventEmitter {
      * @param {number} items[].length the number of elements to read (according to transport)
      * @param {number} items[].dataTransport the transport length of the written buffer
      * @param {Buffer} items[].data the transport length of the written buffer
+     * @returns {Promise<object>}
      */
     async writeVars(items) {
         debug('S7Endpoint writeMultiVars', items);
@@ -697,42 +780,74 @@ class S7Endpoint extends EventEmitter {
         return await this.writeArea(constants.proto.area.FLAGS, address, data);
     }
 
+    /**
+     * Gets a count of blocks from the PLC of each type
+     * @returns {Promise<BlockCountResponse>} an object with the block type as property key ("DB", "FB", ...) and the count as property value
+     */
     async blockCount() {
         debug('S7Endpoint blockCount');
 
         return await this._connection.blockCount();
     }
 
+    /**
+     * List the available blocks of the requested type
+     * @param {number|string} type the block name in string, or its ID
+     * @returns {Promise<ListBlockResponse[]>}
+     */
     async listBlocks(type) {
         debug('S7Endpoint listBlocks');
-        
+
         return await this._connection.listBlocks(type);
     }
 
+    /**
+     * Gets the information buffer of the requested block
+     * @param {string|number} type the block type
+     * @param {number} number the block number
+     * @param {string} [filesystem='A'] the filesystem being queried
+     * @returns {Promise<Buffer>}
+     */
     async getBlockInfo(type, number, filesystem) {
         debug('S7Endpoint getBlockInfo');
 
         return await this._connection.getBlockInfo(type, number, filesystem);
     }
 
+    /**
+     * List all blocks of all available types
+     * @returns {Promise<BlockList>}
+     */
     async listAllBlocks() {
         debug('S7Endpoint listAllBlocks');
 
         let res = {};
-        let types = Object.keys(constants.proto.block.type);
-        for (const type of types) {
-            res[type] = await this.listBlocks(type);
-        }
+        res.OB = await this.listBlocks(constants.proto.block.type.OB);
+        res.DB = await this.listBlocks(constants.proto.block.type.DB);
+        res.SDB = await this.listBlocks(constants.proto.block.type.SDB);
+        res.FC = await this.listBlocks(constants.proto.block.type.FC);
+        res.SFC = await this.listBlocks(constants.proto.block.type.SFC);
+        res.FB = await this.listBlocks(constants.proto.block.type.FB);
+        res.SFB = await this.listBlocks(constants.proto.block.type.SFB);
 
         return res;
     }
 
+    /**
+     * Gets the PLC's date/time
+     * @returns {Promise<Date>}
+     */
     async getTime() {
         debug('S7Endpoint getTime');
 
         return await this._connection.getTime();
     }
 
+    /**
+     * Sets the PLC's date/time
+     * @param {Date} [date=now] The date/time to be set. Defaults to the current timestamp
+     * @returns {Promise<void>}
+     */
     async setTime(date) {
         debug('S7Endpoint setTime', date);
 
@@ -740,11 +855,12 @@ class S7Endpoint extends EventEmitter {
     }
 
     /**
-     * 
+     * Reads the specified block from the PLC
      * @param {string|number} type 
      * @param {number} number 
      * @param {boolean} [headerOnly=false] if we should ask for module header (`$`) instead of complete (`_`)
      * @param {string} [filesystem='A'] the filesystem to query (`A`, `P` or `B`)
+     * @returns {Promise<Buffer>}
      */
     async uploadBlock(type, number, headerOnly = false, filesystem = "A") {
         debug('S7Endpoint uploadBlock', type, number, headerOnly, filesystem);
@@ -784,7 +900,7 @@ class S7Endpoint extends EventEmitter {
     }
 
     /**
-     * gets a SystemStatusList specified by its ID and Index
+     * Gets a SystemStatusList specified by its ID and Index
      * @param {number} [id=0] the SSL ID
      * @param {number} [index=0] the SSL Index
      * @param {boolean} [strict=false] Whether it should verify if the requested Ids and indexes match
@@ -792,7 +908,7 @@ class S7Endpoint extends EventEmitter {
      */
     async getSSL(id = 0, index = 0, strict = false) {
         debug('S7Endpoint getSSL', id, index);
-        
+
         let reqBuf = Buffer.alloc(4);
         reqBuf.writeUInt16BE(id, 0);
         reqBuf.writeUInt16BE(index, 2);
@@ -810,7 +926,7 @@ class S7Endpoint extends EventEmitter {
         let entryLength = res.readUInt16BE(4);
         let entryCount = res.readUInt16BE(6);
 
-        if (entryLength * entryCount !== res.length - 8){
+        if (entryLength * entryCount !== res.length - 8) {
             throw new Error(`Size mismatch, expecting [${entryCount}] x [${entryLength}] + 8, got [${res.length}]`);
         }
 
@@ -829,17 +945,10 @@ class S7Endpoint extends EventEmitter {
      */
     async getAvailableSSL() {
         debug('S7Endpoint getAvailableSSL');
-        
+
         let res = await this.getSSL(0, 0);
         return res.map(b => b.readUInt16BE(0));
     }
-
-    /**
-     * @typedef {object} ModuleInformation
-     * @property {string} [moduleOrderNumber]
-     * @property {string} [hardwareOrderNumber]
-     * @property {string} [firmwareOrderNumber]
-     */
 
     /**
      * Gets and parses the 0x0011 SSL ID that contains, among other
@@ -852,12 +961,12 @@ class S7Endpoint extends EventEmitter {
         debug('S7Endpoint getModuleIdentification');
 
         let res = await this.getSSL(0x0011, 0);
-        
+
         let moduleInfo = {};
 
         for (const buf of res) {
             if (buf.length != 28) throw new Error(`Unexpected buffer size of [${buf.length}] != 28`);
-            
+
             // we're intentionally lefting the version/id fields out. Many ways of representing
             // this info were seen on the wild and finding a way to correctly parse all of
             // them seems to be pretty hard
@@ -874,30 +983,12 @@ class S7Endpoint extends EventEmitter {
                     moduleInfo.firmwareOrderNumber = buf.toString('ascii', 2, 22).trim();
                     break;
                 default:
-                    // unknown, ignore it
+                // unknown, ignore it
             }
         }
 
         return moduleInfo;
     }
-
-    /**
-     * @typedef {object} ComponentIdentification
-     * @property {string} [systemName] W#16#0001: Name of the automation system
-     * @property {string} [moduleName] W#16#0002: Name of the module
-     * @property {string} [plantName] W#16#0003: Plant designation of the module
-     * @property {string} [copyright] W#16#0004: Copyright entry
-     * @property {string} [serialNumber] W#16#0005: Serial number of the module
-     * @property {string} [partType] W#16#0007: Module type name
-     * @property {string} [mmcSerialNumber] W#16#0008: Serial number of the memory card
-     * @property {number} [vendorId] W#16#0009: Manufacturer and profile of a CPU module - Vendor ID
-     * @property {number} [profileId] W#16#0009: Manufacturer and profile of a CPU module - Profile ID
-     * @property {number} [profileSpecific] W#16#0009: Manufacturer and profile of a CPU module - Profile-specific Id
-     * @property {string} [oemString] W#16#000A: OEM ID of a module (S7-300 only)
-     * @property {number} [oemId] W#16#000A: OEM ID of a module (S7-300 only)
-     * @property {number} [oemAdditionalId] W#16#000A: OEM ID of a module (S7-300 only)
-     * @property {string} [location] W#16#000B: Location ID of a module
-     */
 
     /**
      * Gets and parses the 0x001c SSL ID that contains general information
@@ -952,7 +1043,7 @@ class S7Endpoint extends EventEmitter {
                     deviceInfo.location = buf.toString('ascii', 2).replace(/\x00/g, '');
                     break;
                 default:
-                    //unknown id, ignore it
+                //unknown id, ignore it
             }
         }
 

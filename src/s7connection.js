@@ -37,6 +37,24 @@ const CONN_CONNECTED = 2;
 const CONN_DISCONNECTED = 3;
 const CONN_ERROR = 99;
 
+/**
+ * @typedef {object} BlockCountResponse
+ * @property {number} [OB] the amount of OBs
+ * @property {number} [DB] the amount of DBs
+ * @property {number} [SDB] the amount of SDBs
+ * @property {number} [FC] the amount of FCs
+ * @property {number} [SFC] the amount of SFCs
+ * @property {number} [FB] the amount of FBs
+ * @property {number} [SFB] the amount of SFBs
+ */
+
+/**
+ * @typedef {object} ListBlockResponse
+ * @property {number} number the block number
+ * @property {number} flags
+ * @property {number} lang
+ */
+
 
 /**
  * Emitted when an error occurs while communicating
@@ -52,8 +70,8 @@ const CONN_ERROR = 99;
 class S7Connection extends EventEmitter {
 
     /**
-     * 
-     * @param {object} stream 
+     * Creates a new S7 Connection
+     * @param {object} stream the Duplex Stream used to exchange data with the PLC
      * @param {object} [opts] configuration options
      * @param {number} [opts.maxJobs] the max number of parallel jobs
      * @param {number} [opts.maxPDUSize] the max PDU Size
@@ -87,6 +105,10 @@ class S7Connection extends EventEmitter {
         this._initParams();
     }
 
+    /**
+     * Initialize internal variables
+     * @private
+     */
     _initParams() {
         debug('S7Connection _initParams');
 
@@ -98,6 +120,10 @@ class S7Connection extends EventEmitter {
         this._jobInProcess = new Map();
     }
 
+    /**
+     * Compute the next PDU sequence number, accounting for overflows
+     * @private
+     */
     _nextPDU() {
         let pdu = this._pduSequence++;
         if (this._pduSequence > 0xffff) {
@@ -106,12 +132,22 @@ class S7Connection extends EventEmitter {
         return pdu;
     }
 
+    /**
+     * Handles "error" events from Parser
+     * @private
+     * @param {*} e 
+     */
     _onParserError(e) {
         debug('S7Connection _onParserError', e);
         this.emit('error', e);
         this.destroy(); //abort connection if we can't understand what we're receiving
     }
 
+    /**
+     * Handles "error" events from Serializer
+     * @private
+     * @param {*} e
+     */
     _onSerializerError(e) {
         debug('S7Connection _onSerializerError', e);
         this.emit('error', e);
@@ -119,8 +155,7 @@ class S7Connection extends EventEmitter {
     }
 
     /**
-     * Handles incoming data
-     * 
+     * Handles incoming data from Parser
      * @private
      * @param {object} data 
      */
@@ -198,6 +233,11 @@ class S7Connection extends EventEmitter {
         this.emit('message', data);
     }
 
+    /**
+     * Executes the needed actions when a timeout for a set PDU occurs
+     * @private
+     * @param {number} pdu 
+     */
     _onRequestTimeout(pdu) {
         debug('S7Connection _onRequestTimeout', pdu);
 
@@ -217,6 +257,10 @@ class S7Connection extends EventEmitter {
         this.emit('timeout', job && job.payload);
     }
 
+    /**
+     * Process the internal queue of jobs
+     * @private
+     */
     _processQueue() {
         debug('S7Connection _processQueue');
 
@@ -246,6 +290,7 @@ class S7Connection extends EventEmitter {
 
     /**
      * the negotiated maximum pdu size
+     * @returns {number}
      */
     get pduSize() {
         return this._pduSize;
@@ -253,6 +298,7 @@ class S7Connection extends EventEmitter {
 
     /**
      * the negotiated number of maximum parallel jobs
+     * @returns {number}
      */
     get parallelJobs() {
         return this._maxJobs;
@@ -260,6 +306,7 @@ class S7Connection extends EventEmitter {
 
     /**
      * whether we're connected or not
+     * @returns {boolean}
      */
     get isConnected() {
         return this._connectionState === CONN_CONNECTED;
@@ -267,6 +314,7 @@ class S7Connection extends EventEmitter {
 
     /**
      * Initiates the connection using the provided stream
+     * @param {function} [cb] an optional callback, added once to the "connect" event
      */
     connect(cb) {
         debug('S7Connection connect');
@@ -276,6 +324,7 @@ class S7Connection extends EventEmitter {
         }
 
         if (typeof cb === 'function') {
+            //@ts-ignore
             this.once('connect', cb);
         }
 
@@ -333,7 +382,7 @@ class S7Connection extends EventEmitter {
      * 
      * @async
      * @param {object} msg the message to be sent to the PLC
-     * @returns the response sent by the PLC on the fulfillment of the Promise
+     * @returns {Promise<object>} the response sent by the PLC on the fulfillment of the Promise
      */
     sendRaw(msg) {
         debug('S7Connection sendRaw', msg);
@@ -481,24 +530,13 @@ class S7Connection extends EventEmitter {
     }
 
     /**
-     * @typedef {object} BlockCountResponse
-     * @property {number} [OB] the amount of OBs
-     * @property {number} [DB] the amount of DBs
-     * @property {number} [SDB] the amount of SDBs
-     * @property {number} [FC] the amount of FCs
-     * @property {number} [SFC] the amount of SFCs
-     * @property {number} [FB] the amount of FBs
-     * @property {number} [SFB] the amount of SFBs
-     */
-
-    /**
      * gets a count of blocks from the PLC
      * @returns {Promise<BlockCountResponse>} an object with the block type as property key ("DB", "FB", ...) and the count as property value
      */
     async blockCount() {
         debug('S7Connection blockCount');
 
-        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC, 
+        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC,
             constants.proto.userData.subfunction.BLOCK_FUNC.LIST);
 
         if (res.length % 4) {
@@ -526,13 +564,6 @@ class S7Connection extends EventEmitter {
 
         return blockCount;
     }
-
-    /**
-     * @typedef {object} ListBlockResponse
-     * @property {number} number the block number
-     * @property {number} flags
-     * @property {number} lang
-     */
 
     /**
      * 
@@ -568,7 +599,7 @@ class S7Connection extends EventEmitter {
 
         let req = Buffer.from(blkTypeString);
 
-        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC, 
+        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC,
             constants.proto.userData.subfunction.BLOCK_FUNC.TYPE, req);
 
         if (res.length % 4) {
@@ -580,7 +611,7 @@ class S7Connection extends EventEmitter {
             let number = res.readUInt16BE(i);
             let flags = res.readUInt8(i + 2);
             let lang = res.readUInt8(i + 3);
-            blocks.push({number, flags, lang});
+            blocks.push({ number, flags, lang });
         }
 
         return blocks;
@@ -617,14 +648,14 @@ class S7Connection extends EventEmitter {
         let blkTypeString = blkTypeId.toString(16).padStart(2, '0').toUpperCase();
         let blkNumString = number.toString().padStart(5, '0');
         let filename = blkTypeString + blkNumString + filesystem;
-        
+
         if (filename.length !== 8) {
             throw new Error(`Internal error on generated filename [${filename}]`);
         }
 
         let req = Buffer.from(filename);
 
-        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC, 
+        let res = await this.sendUserData(constants.proto.userData.function.BLOCK_FUNC,
             constants.proto.userData.subfunction.BLOCK_FUNC.BLOCKINFO, req);
 
         return res;
@@ -718,7 +749,7 @@ class S7Connection extends EventEmitter {
             }
         });
 
-        if (upStartRes.param.status !== 0){
+        if (upStartRes.param.status !== 0) {
             throw new Error(`Unexpected status [${upStartRes.param.status}] != 0 on uploadStart`);
         }
 
@@ -747,17 +778,17 @@ class S7Connection extends EventEmitter {
                         uploadID: uploadId
                     }
                 });
-                
+
                 upResMoreData = upRes.param.status & 0x01;
                 upResErr = upRes.param.status & 0x02;
                 let payload = upRes.data.payload;
 
                 debug('S7Connection uploadBlock upload-res', upRes.param.status, payload && payload.length);
-                
+
                 if (upResErr) {
                     throw new Error(`Unexpected error status [${upRes.param.status}] on upload`);
                 }
-                
+
                 blockParts.push(payload);
 
             } while (upResMoreData);
