@@ -833,6 +833,131 @@ class S7Endpoint extends EventEmitter {
         let res = await this.getSSL(0, 0);
         return res.map(b => b.readUInt16BE(0));
     }
+
+    /**
+     * @typedef {object} ModuleInformation
+     * @property {string} [moduleOrderNumber]
+     * @property {string} [hardwareOrderNumber]
+     * @property {string} [firmwareOrderNumber]
+     */
+
+    /**
+     * Gets and parses the 0x0011 SSL ID that contains, among other
+     * infos, the equipment's order number.
+     * This may not be supported by the PLC. In this case, an error
+     * is thrown
+     * @returns {Promise<ModuleInformation>}
+     */
+    async getModuleIdentification() {
+        debug('S7Endpoint getModuleIdentification');
+
+        let res = await this.getSSL(0x0011, 0);
+        
+        let moduleInfo = {};
+
+        for (const buf of res) {
+            if (buf.length != 28) throw new Error(`Unexpected buffer size of [${buf.length}] != 28`);
+            
+            // we're intentionally lefting the version/id fields out. Many ways of representing
+            // this info were seen on the wild and finding a way to correctly parse all of
+            // them seems to be pretty hard
+
+            let id = buf.readUInt16BE(0);
+            switch (id & 0xff) {
+                case 1:
+                    moduleInfo.moduleOrderNumber = buf.toString('ascii', 2, 22).trim();
+                    break;
+                case 6:
+                    moduleInfo.hardwareOrderNumber = buf.toString('ascii', 2, 22).trim();
+                    break;
+                case 7:
+                    moduleInfo.firmwareOrderNumber = buf.toString('ascii', 2, 22).trim();
+                    break;
+                default:
+                    // unknown, ignore it
+            }
+        }
+
+        return moduleInfo;
+    }
+
+    /**
+     * @typedef {object} ComponentIdentification
+     * @property {string} [systemName] W#16#0001: Name of the automation system
+     * @property {string} [moduleName] W#16#0002: Name of the module
+     * @property {string} [plantName] W#16#0003: Plant designation of the module
+     * @property {string} [copyright] W#16#0004: Copyright entry
+     * @property {string} [serialNumber] W#16#0005: Serial number of the module
+     * @property {string} [partType] W#16#0007: Module type name
+     * @property {string} [mmcSerialNumber] W#16#0008: Serial number of the memory card
+     * @property {number} [vendorId] W#16#0009: Manufacturer and profile of a CPU module - Vendor ID
+     * @property {number} [profileId] W#16#0009: Manufacturer and profile of a CPU module - Profile ID
+     * @property {number} [profileSpecific] W#16#0009: Manufacturer and profile of a CPU module - Profile-specific Id
+     * @property {string} [oemString] W#16#000A: OEM ID of a module (S7-300 only)
+     * @property {number} [oemId] W#16#000A: OEM ID of a module (S7-300 only)
+     * @property {number} [oemAdditionalId] W#16#000A: OEM ID of a module (S7-300 only)
+     * @property {string} [location] W#16#000B: Location ID of a module
+     */
+
+    /**
+     * Gets and parses the 0x001c SSL ID that contains general information
+     * about the device and the installation
+     * This may not be supported by the PLC. In this case, an error
+     * is thrown
+     * @returns {Promise<ComponentIdentification>}
+     */
+    async getComponentIdentification() {
+        debug('S7Endpoint getComponentIdentification');
+
+        let devInfo = await this.getSSL(0x001c, 0);
+
+        let deviceInfo = {};
+
+        for (const buf of devInfo) {
+            let id = buf.readUInt16BE(0);
+
+            switch (id & 0xff) {
+                case 1:
+                    deviceInfo.plcName = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 2:
+                    deviceInfo.moduleName = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 3:
+                    deviceInfo.plantID = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 4:
+                    deviceInfo.copyright = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 5:
+                    deviceInfo.serialNumber = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 7:
+                    deviceInfo.partType = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 8:
+                    deviceInfo.mmcSerialNumber = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                case 9:
+                    deviceInfo.vendorId = buf.readUInt16BE(2);
+                    deviceInfo.profileId = buf.readUInt16BE(4);
+                    deviceInfo.profileSpecific = buf.readUInt16BE(2);
+                    break;
+                case 10:
+                    deviceInfo.oemString = buf.toString('ascii', 2, 28).replace(/\x00/g, '');
+                    deviceInfo.oemId = buf.readUInt16BE(28);
+                    deviceInfo.oemAdditionalId = buf.readUInt32BE(30);
+                    break;
+                case 11:
+                    deviceInfo.location = buf.toString('ascii', 2).replace(/\x00/g, '');
+                    break;
+                default:
+                    //unknown id, ignore it
+            }
+        }
+
+        return deviceInfo;
+    }
 }
 
 module.exports = S7Endpoint
