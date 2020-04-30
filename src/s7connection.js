@@ -310,6 +310,7 @@ class S7Connection extends EventEmitter {
         this.clearQueue();
         this._jobInProcess.forEach(job => {
             job.rej(new Error("Disconnected"));
+            clearTimeout(job.timer);
         });
         this._jobInProcess.clear();
 
