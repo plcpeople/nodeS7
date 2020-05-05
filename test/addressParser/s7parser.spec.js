@@ -199,7 +199,7 @@ describe('NodeS7 Address Parser', () => {
 
     // TODO: Add more addresses
     
-    catchAddress("FOO", "invalid format");
+    catchAddress("FOO", "invalid address format");
     catchAddress("D0.0", "address type");
     catchAddress("MFOO3", "Unknown data type");
     catchAddress("MB0.0.1", "use of bit address");
@@ -208,7 +208,7 @@ describe('NodeS7 Address Parser', () => {
     catchAddress("DB0,X0.1", "Invalid DB Number");
     catchAddress("DB1,FOO0", "Unknown DB data type");
     catchAddress("DB12,S10", "String length required");
-    catchAddress("DB7.X0.5", "invalid format"); //dot instead of comma
+    catchAddress("DB7.X0.5", "invalid address format"); //dot instead of comma
     catchAddress("I0.10", "Bit address offset out of range");
     catchAddress("IB0.0", "Invalid array length");
 

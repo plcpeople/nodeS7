@@ -51,7 +51,7 @@ class AddressParserNodeS7 {
 
         let match = address.match(REGEX_NODES7_ADDR);
         if (!match) {
-            throw new Error("Couldn't parse item address, invalid format");
+            throw new Error(`Could not parse item "${address}", invalid address format`);
         }
 
         debug("S7Item parseAddress_NodeS7 match", match);
@@ -134,7 +134,7 @@ class AddressParserNodeS7 {
                     dataType = "REAL";
                     break;
                 default:
-                    throw new Error(`Unknown DB data type "${dataType}" for address "${address}"`);
+                    throw new Error(`Unknown DB data type "${match_area}" for address "${address}"`);
             }
 
         } else {
