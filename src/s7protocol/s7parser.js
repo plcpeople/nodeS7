@@ -303,13 +303,22 @@ class S7Parser extends Transform {
             case constants.proto.function.READ_VAR:
                 obj.items = [];
                 for (let i = 0; i < param.itemCount; i++) {
+                    if (chunk.length - offset < 4) {
+                        return new Error(`Malformed READ_VAR response data, expecting at least 4 bytes parsing item [${i}]`);
+                    }
+
                     let returnCode = chunk.readUInt8(offset);
                     offset += 1;
                     let transportSize = chunk.readUInt8(offset);
                     offset += 1;
                     let itemLenBytes = chunk.readUInt16BE(offset);
                     offset += 2;
-                    if (transportSize === constants.proto.dataTransport.BBIT ||
+                    if (returnCode !== constants.proto.retval.DATA_OK &&
+                        transportSize === constants.proto.dataTransport.NULL) {
+                            //we shouldn't expect any data with error on return code
+                            // and null transport, although the PLC may report some length
+                            itemLenBytes = 0;
+                    } else if (transportSize === constants.proto.dataTransport.BBIT ||
                         transportSize === constants.proto.dataTransport.BBYTE ||
                         transportSize === constants.proto.dataTransport.BINT) {
                         //the length is in bits for these transports

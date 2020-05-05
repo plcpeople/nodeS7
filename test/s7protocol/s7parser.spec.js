@@ -625,6 +625,106 @@ describe('S7Protocol Parser', () => {
         parser.write(Buffer.from('320300000003000200e000000401ff0406e08000008200070000913c5f5f5f5f5f5f5f5f5f5f5f5f5f5f3030303030300004040000008000008100080000a7195f5f5f5f5f5f5f5f5f5f5f5f5f5f3030303030300008080000008000008000090000bcf65f5f5f5f5f5f5f5f5f5f5f5f5f5f3030303030300008080000008000007f000a0000d2d35f5f5f5f5f5f5f5f5f5f5f5f5f5f3030303030300000000000008000007e000b0000e8af5f5f5f5f5f5f5f5f5f5f5f5f5f5f3030303030300000000000008000007d000c0000fe8c5f5f5f5f5f5f5f5f5f5f5f5f5f5f3030303030300000000000008000007c', 'hex'));
     });
 
+    /* Looks like a malformed packet but seen on https://github.com/plcpeople/nodeS7/issues/107 */
+    it('should decode a Response -> ReadVar (object does not exist, with data length)', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 3,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.READ_VAR,
+                    itemCount: 2
+                },
+                data: {
+                    items: [{
+                        returnCode: constants.proto.retval.DATA_ERR,
+                        transportSize: constants.proto.dataTransport.NULL,
+                        data: Buffer.from('', 'hex')
+                    }, {
+                        returnCode: constants.proto.retval.DATA_OK,
+                        transportSize: constants.proto.dataTransport.BBYTE,
+                        data: Buffer.from('02', 'hex')
+                    }]
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('32030000000300020009000004020a000004ff04000802', 'hex'));
+    });
+
+    it('should decode a Response -> ReadVar (object does not exist, without data length)', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 1,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.READ_VAR,
+                    itemCount: 2
+                },
+                data: {
+                    items: [{
+                        returnCode: constants.proto.retval.DATA_OK,
+                        transportSize: constants.proto.dataTransport.BBYTE,
+                        data: Buffer.from('00', 'hex')
+                    }, {
+                        returnCode: constants.proto.retval.DATA_ERR,
+                        transportSize: constants.proto.dataTransport.NULL,
+                        data: Buffer.from('', 'hex')
+                    }]
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('3203000000010002000a00000402ff04000800000a000000', 'hex'));
+    });
+
+    it('should decode a Response -> ReadVar (data out of range)', (done) => {
+        let parser = new S7Parser();
+        parser.on('data', (data) => {
+            expect(data).to.be.deep.equal({
+                header: {
+                    type: constants.proto.type.RESPONSE,
+                    rid: 0,
+                    pduReference: 1,
+                    errorCode: 0,
+                    errorClass: 0
+                },
+                param: {
+                    function: constants.proto.function.READ_VAR,
+                    itemCount: 2
+                },
+                data: {
+                    items: [{
+                        returnCode: constants.proto.retval.DATA_OUTOFRANGE,
+                        transportSize: constants.proto.dataTransport.NULL,
+                        data: Buffer.from('', 'hex')
+                    }, {
+                        returnCode: constants.proto.retval.DATA_OK,
+                        transportSize: constants.proto.dataTransport.BBYTE,
+                        data: Buffer.from('00', 'hex')
+                    }]
+                }
+            });
+            done();
+        });
+
+        parser.write(Buffer.from('320300000001000200090000040205000000ff04000800', 'hex'));
+    });
+
     it('should decode a Request -> Upload start', (done) => {
         let parser = new S7Parser();
         parser.on('data', (data) => {
@@ -1023,5 +1123,16 @@ describe('S7Protocol Parser', () => {
         });
 
         parser.write(Buffer.from('320700005500000c00040001120812430201000000000a000000', 'hex'));
+    });
+
+    it('should emit an error decoding a Response -> ReadVar with malformed response data', (done) => {
+        let parser = new S7Parser();
+        parser.on('error', (err) => {
+            expect(err).to.be.an('error');
+            done();
+        });
+
+        // manually handcrafted invalid packet
+        parser.write(Buffer.from('32030000000300020007000004020a000004ff0400', 'hex'));
     });
 });
