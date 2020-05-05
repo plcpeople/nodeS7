@@ -386,101 +386,110 @@ class S7Parser extends Transform {
 
         while (ptr < chunk.length) {
 
-            let obj = {};
+            try {
+                let obj = {};
 
-            // S7 header
-            // 0x32 + type(1) + redundancyID(2) + pduReference(2) + parameterLength(2) + dataLength(2) [ + errorClass(1) + errorCode(1) ] = 10[12]
-            let header = {};
+                // S7 header
+                // 0x32 + type(1) + redundancyID(2) + pduReference(2) + parameterLength(2) + dataLength(2) [ + errorClass(1) + errorCode(1) ] = 10[12]
+                let header = {};
 
-            let protocolID = chunk.readUInt8(ptr);
-            if (protocolID !== constants.proto.ID) {
-                debug("S7Parser _transform err-unknown-proto-id", protocolID);
-                cb(new Error(`Unknown protocol ID [${protocolID}]`));
+                let protocolID = chunk.readUInt8(ptr);
+                if (protocolID !== constants.proto.ID) {
+                    debug("S7Parser _transform err-unknown-proto-id", protocolID);
+                    cb(new Error(`Unknown protocol ID [${protocolID}]`));
+                    return;
+                }
+                ptr += 1;
+
+                header.type = chunk.readUInt8(ptr);
+                ptr += 1;
+
+                header.rid = chunk.readUInt16BE(ptr);
+                ptr += 2;
+
+                header.pduReference = chunk.readUInt16BE(ptr);
+                ptr += 2;
+
+                let paramLength = chunk.readUInt16BE(ptr);
+                ptr += 2;
+                let dataLength = chunk.readUInt16BE(ptr);
+                ptr += 2;
+
+                if (header.type == constants.proto.type.RESPONSE || header.type == constants.proto.type.ACK) {
+                    header.errorClass = chunk.readUInt8(ptr);
+                    ptr += 1;
+                    header.errorCode = chunk.readUInt8(ptr);
+                    ptr += 1;
+                }
+
+                obj.header = header;
+
+                //S7 Parameter
+                if (paramLength > 0) {
+                    let param;
+                    switch (header.type) {
+                        case constants.proto.type.REQUEST:
+                            param = this._parseRequestParameter(chunk, ptr, paramLength);
+                            break;
+                        case constants.proto.type.ACK:
+                        case constants.proto.type.RESPONSE:
+                            param = this._parseResponseParameter(chunk, ptr, paramLength);
+                            break;
+                        case constants.proto.type.USERDATA:
+                            param = this._parseUserDataParameter(chunk, ptr, paramLength);
+                            break;
+                        default:
+                            debug("S7Parser _transform err-unknown-header-type", header.type);
+                            cb(new Error(`Unknown header type [${header.type}]`));
+                            return;
+                    }
+
+                    //report an eventual error
+                    if (param instanceof Error) {
+                        cb(param);
+                        return;
+                    }
+
+                    obj.param = param;
+                    ptr += paramLength;
+                }
+
+                //S7 Data
+                if (dataLength > 0) {
+                    let data;
+                    switch (header.type) {
+                        case constants.proto.type.REQUEST:
+                            data = this._parseRequestData(chunk, ptr, dataLength, obj.param);
+                            break;
+                        case constants.proto.type.ACK:
+                        case constants.proto.type.RESPONSE:
+                            data = this._parseResponseData(chunk, ptr, dataLength, obj.param);
+                            break;
+                        case constants.proto.type.USERDATA:
+                            data = this._parseUserDataData(chunk, ptr, dataLength, obj.param);
+                            break;
+                        default:
+                            debug("S7Parser _transform err-unknown-header-type", header.type);
+                            cb(new Error(`Unknown header type [${header.type}]`));
+                            return;
+                    }
+
+                    //report an eventual error
+                    if (data instanceof Error) {
+                        cb(data);
+                        return;
+                    }
+
+                    obj.data = data;
+                    ptr += dataLength;
+                }
+
+            } catch (e) {
+                // Prevents error in this try-catch block from bubbling up
+                // and crashing the whole process. Handles them as stream
+                // errors instead
+                cb(e);
                 return;
-            }
-            ptr += 1;
-
-            header.type = chunk.readUInt8(ptr);
-            ptr += 1;
-
-            header.rid = chunk.readUInt16BE(ptr);
-            ptr += 2;
-
-            header.pduReference = chunk.readUInt16BE(ptr);
-            ptr += 2;
-
-            let paramLength = chunk.readUInt16BE(ptr);
-            ptr += 2;
-            let dataLength = chunk.readUInt16BE(ptr);
-            ptr += 2;
-
-            if (header.type == constants.proto.type.RESPONSE || header.type == constants.proto.type.ACK) {
-                header.errorClass = chunk.readUInt8(ptr);
-                ptr += 1;
-                header.errorCode = chunk.readUInt8(ptr);
-                ptr += 1;
-            }
-
-            obj.header = header;
-
-            //S7 Parameter
-            if (paramLength > 0) {
-                let param;
-                switch (header.type) {
-                    case constants.proto.type.REQUEST:
-                        param = this._parseRequestParameter(chunk, ptr, paramLength);
-                        break;
-                    case constants.proto.type.ACK:
-                    case constants.proto.type.RESPONSE:
-                        param = this._parseResponseParameter(chunk, ptr, paramLength);
-                        break;
-                    case constants.proto.type.USERDATA:
-                        param = this._parseUserDataParameter(chunk, ptr, paramLength);
-                        break;
-                    default:
-                        debug("S7Parser _transform err-unknown-header-type", header.type);
-                        cb(new Error(`Unknown header type [${header.type}]`));
-                        return;
-                }
-
-                //report an eventual error
-                if (param instanceof Error) {
-                    cb(param);
-                    return;
-                }
-
-                obj.param = param;
-                ptr += paramLength;
-            }
-
-            //S7 Data
-            if (dataLength > 0) {
-                let data;
-                switch (header.type) {
-                    case constants.proto.type.REQUEST:
-                        data = this._parseRequestData(chunk, ptr, dataLength, obj.param);
-                        break;
-                    case constants.proto.type.ACK:
-                    case constants.proto.type.RESPONSE:
-                        data = this._parseResponseData(chunk, ptr, dataLength, obj.param);
-                        break;
-                    case constants.proto.type.USERDATA:
-                        data = this._parseUserDataData(chunk, ptr, dataLength, obj.param);
-                        break;
-                    default:
-                        debug("S7Parser _transform err-unknown-header-type", header.type);
-                        cb(new Error(`Unknown header type [${header.type}]`));
-                        return;
-                }
-
-                //report an eventual error
-                if (data instanceof Error) {
-                    cb(data);
-                    return;
-                }
-
-                obj.data = data;
-                ptr += dataLength;
             }
 
             this.push(obj);
