@@ -45,7 +45,12 @@ describe('S7Protocol Parser', () => {
             done();
         });
 
-        parser.write({});
+        try {
+            parser.write({});
+        } catch (err) {
+            expect(err).to.be.an('error');
+            done();
+        }
     });
 
     it('should decode a Request -> Communication setup', (done) => {
