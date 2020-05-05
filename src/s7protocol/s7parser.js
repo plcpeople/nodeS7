@@ -48,16 +48,16 @@ class S7Parser extends Transform {
 
         obj.function = chunk.readUInt8(offset);
         offset += 1;
-        switch(obj.function){
+        switch (obj.function) {
             case constants.proto.function.READ_VAR:
             case constants.proto.function.WRITE_VAR:
                 let itemCount = chunk.readUInt8(offset);
                 offset += 1;
 
                 obj.items = [];
-                for(let i = 0; i < itemCount; i++){
+                for (let i = 0; i < itemCount; i++) {
                     let varSpec = chunk.readUInt8(offset);
-                    if (varSpec != constants.proto.VAR_SPEC){
+                    if (varSpec != constants.proto.VAR_SPEC) {
                         return new Error(`Unknown variable specification [${varSpec}]`);
                     }
 
@@ -80,7 +80,7 @@ class S7Parser extends Transform {
             case constants.proto.function.UPLOAD_END:
                 obj.status = chunk.readUInt8(offset);
                 offset += 1;
-                if (obj.function == constants.proto.function.UPLOAD_END){
+                if (obj.function == constants.proto.function.UPLOAD_END) {
                     obj.errorCode = chunk.readUInt16BE(offset);
                 }
                 offset += 2;
@@ -127,7 +127,7 @@ class S7Parser extends Transform {
                 return new Error(`Unknown request parameter function [${obj.function}]`);
         }
 
-        if(offset > offsetStart + length) {
+        if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the parameters area
             return new Error(`Parser overflow reading request parameter [${offset}] > [${offsetStart + length}]`);
         }
@@ -142,7 +142,7 @@ class S7Parser extends Transform {
 
         obj.function = chunk.readUInt8(offset);
         offset += 1;
-        switch(obj.function){
+        switch (obj.function) {
             case constants.proto.function.READ_VAR:
             case constants.proto.function.WRITE_VAR:
                 obj.itemCount = chunk.readUInt8(offset);
@@ -182,7 +182,7 @@ class S7Parser extends Transform {
                 return new Error(`Unknown response parameter function [${obj.function}]`);
         }
 
-        if(offset > offsetStart + length) {
+        if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the parameters area
             return new Error(`Parser overflow reading response parameter [${offset}] > [${offsetStart + length}]`);
         }
@@ -198,7 +198,7 @@ class S7Parser extends Transform {
         let head = chunk.readUIntBE(offset, 3);
         offset += 3;
 
-        if (head !== 0x000112){
+        if (head !== 0x000112) {
             return new Error(`Unknown header value [0x${head.toString(16)}] != 0x000112`);
         }
 
@@ -214,7 +214,7 @@ class S7Parser extends Transform {
         offset += 1;
         obj.sequenceNumber = chunk.readUInt8(offset);
         offset += 1;
-        if(paramLength == 8){
+        if (paramLength == 8) {
             obj.dataUnitReference = chunk.readUInt8(offset);
             offset += 1;
             obj.hasMoreData = !!(chunk.readUInt8(offset));
@@ -239,7 +239,7 @@ class S7Parser extends Transform {
         switch (param.function) {
             case constants.proto.function.WRITE_VAR:
                 obj.items = [];
-                for(let i = 0; i < param.items.length; i++){
+                for (let i = 0; i < param.items.length; i++) {
                     let returnCode = chunk.readUInt8(offset);
                     offset += 1;
                     let transportSize = chunk.readUInt8(offset);
@@ -247,11 +247,11 @@ class S7Parser extends Transform {
                     let itemLenBytes = chunk.readUInt16BE(offset);
                     offset += 2;
                     if (transportSize === constants.proto.dataTransport.BBIT ||
-                        transportSize === constants.proto.dataTransport.BBYTE || 
+                        transportSize === constants.proto.dataTransport.BBYTE ||
                         transportSize === constants.proto.dataTransport.BINT) {
-                            //the length is in bits for these transports
-                            itemLenBytes = Math.ceil(itemLenBytes / 8);
-                        }
+                        //the length is in bits for these transports
+                        itemLenBytes = Math.ceil(itemLenBytes / 8);
+                    }
                     obj.items.push({
                         returnCode,
                         transportSize,
@@ -302,7 +302,7 @@ class S7Parser extends Transform {
                 break;
             case constants.proto.function.READ_VAR:
                 obj.items = [];
-                for(let i = 0; i < param.itemCount; i++){
+                for (let i = 0; i < param.itemCount; i++) {
                     let returnCode = chunk.readUInt8(offset);
                     offset += 1;
                     let transportSize = chunk.readUInt8(offset);
@@ -310,11 +310,11 @@ class S7Parser extends Transform {
                     let itemLenBytes = chunk.readUInt16BE(offset);
                     offset += 2;
                     if (transportSize === constants.proto.dataTransport.BBIT ||
-                        transportSize === constants.proto.dataTransport.BBYTE || 
+                        transportSize === constants.proto.dataTransport.BBYTE ||
                         transportSize === constants.proto.dataTransport.BINT) {
-                            //the length is in bits for these transports
-                            itemLenBytes = Math.ceil(itemLenBytes / 8);
-                        }
+                        //the length is in bits for these transports
+                        itemLenBytes = Math.ceil(itemLenBytes / 8);
+                    }
                     obj.items.push({
                         returnCode,
                         transportSize,
@@ -342,7 +342,7 @@ class S7Parser extends Transform {
 
     _parseUserDataData(chunk, offset, length, param) {
         debug("S7Parser _parseUserDataData", offset, length, param);
-        
+
         let obj = {}, offsetStart = offset;
 
         obj.returnCode = chunk.readUInt8(offset);
@@ -408,7 +408,7 @@ class S7Parser extends Transform {
 
             header.pduReference = chunk.readUInt16BE(ptr);
             ptr += 2;
-            
+
             let paramLength = chunk.readUInt16BE(ptr);
             ptr += 2;
             let dataLength = chunk.readUInt16BE(ptr);
@@ -424,9 +424,9 @@ class S7Parser extends Transform {
             obj.header = header;
 
             //S7 Parameter
-            if(paramLength > 0){
+            if (paramLength > 0) {
                 let param;
-                switch(header.type){
+                switch (header.type) {
                     case constants.proto.type.REQUEST:
                         param = this._parseRequestParameter(chunk, ptr, paramLength);
                         break;
@@ -454,7 +454,7 @@ class S7Parser extends Transform {
             }
 
             //S7 Data
-            if (dataLength > 0){
+            if (dataLength > 0) {
                 let data;
                 switch (header.type) {
                     case constants.proto.type.REQUEST:

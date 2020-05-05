@@ -393,8 +393,8 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
             break;
         case "DT":
         case "DTZ":
-            if (!(data instanceof Date)){
-                if (data > 631152000000 && data < 3786911999999){
+            if (!(data instanceof Date)) {
+                if (data > 631152000000 && data < 3786911999999) {
                     // is between "1990-01-01T00:00:00.000Z" and "2089-12-31T23:59:59.999Z" in JS epoch
                     data = new Date(data);
                 } else {
@@ -404,7 +404,7 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
             break;
         case "DTL":
         case "DTLZ":
-            if (!(data instanceof Date)){
+            if (!(data instanceof Date)) {
                 if (data >= 0 && data < 9223382836854) {
                     // is between "1970-01-01T00:00:00.000Z" and "2262-04-11T23:47:16.854Z" in JS epoch
                     // as per type's range definition

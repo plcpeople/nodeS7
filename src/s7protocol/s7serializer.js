@@ -293,7 +293,7 @@ class S7Serializer extends Transform {
 
         if (chunk.param.method !== constants.proto.userData.method.REQUEST
             && chunk.param.method !== constants.proto.userData.method.RESPONSE) {
-                return new Error(`Unknown userData method [${chunk.param.method}]`);
+            return new Error(`Unknown userData method [${chunk.param.method}]`);
         }
 
         let isResMethod = chunk.param.method === constants.proto.userData.method.RESPONSE;

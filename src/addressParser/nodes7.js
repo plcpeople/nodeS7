@@ -66,7 +66,7 @@ class AddressParserNodeS7 {
         // variables for the parsed and validated fields
         let addrType, dataType, dataTypeLength, addressOffset,
             bitAddressOffset, arrayLength, dbNumber,
-            readTransportCode, writeTransportCode, areaCode, 
+            readTransportCode, writeTransportCode, areaCode,
             byteLength, byteLengthWrite, byteLengthWithFill;
 
         /* Parse S7 Address */
@@ -346,10 +346,10 @@ class AddressParserNodeS7 {
             bitOffset: bitAddressOffset,
             arrayLength: arrayLength,
             dbNumber: dbNumber,
-            readTransportCode: readTransportCode, 
-            writeTransportCode: writeTransportCode, 
+            readTransportCode: readTransportCode,
+            writeTransportCode: writeTransportCode,
             areaCode: areaCode,
-            byteLength: byteLength, 
+            byteLength: byteLength,
             byteLengthWrite: byteLengthWrite,
             byteLengthWithFill: byteLengthWithFill
         };
