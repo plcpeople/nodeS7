@@ -86,8 +86,7 @@ class S7ItemGroup extends EventEmitter {
 
         // we still don't have the pdu size, so abort computation
         if (!this._endpoint.pduSize) {
-            debug('S7ItemGroup _prepareReadPackets no-pdu-size');
-            return;
+            throw new Error('PDU Size not available for optimization (not connected to the PLC yet?)');
         }
 
         this._readPackets = [];
