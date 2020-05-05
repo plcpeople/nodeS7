@@ -484,6 +484,8 @@ class S7Parser extends Transform {
                     ptr += dataLength;
                 }
 
+                this.push(obj);
+
             } catch (e) {
                 // Prevents error in this try-catch block from bubbling up
                 // and crashing the whole process. Handles them as stream
@@ -491,8 +493,6 @@ class S7Parser extends Transform {
                 cb(e);
                 return;
             }
-
-            this.push(obj);
         }
 
         cb();
