@@ -220,6 +220,9 @@ class S7Connection extends EventEmitter {
              */
             process.nextTick(() => this.emit('connect'));
 
+            // send jobs in queue (if any)
+            this._processQueue();
+
             return;
         }
 
