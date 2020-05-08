@@ -570,7 +570,7 @@ class S7ItemGroup extends EventEmitter {
                 // check response's error code
                 if (resPart.returnCode != constants.proto.retval.DATA_OK) {
                     let errDesc = constants.proto.retvalDesc[resPart.returnCode] || `<Unknown error code ${resPart.returnCode}>`;
-                    throw new Error(`Error returned from request of Area [${resPart.area}] DB [${resPart.db}] Addr [${resPart.address}] Len [${resPart.length}]: "${errDesc}"`)
+                    throw new Error(`Error returned from request of Area [${reqPart.area}] DB [${reqPart.db}] Addr [${reqPart.address}] Len [${reqPart.length}]: "${errDesc}"`)
                 }
 
                 // good to go, parse response
