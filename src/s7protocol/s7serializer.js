@@ -28,6 +28,8 @@ const constants = require('../constants.json');
 const util = require('util');
 const debug = util.debuglog('nodes7');
 
+const NodeS7Error = require('../errors.js');
+
 const PTR_HDR_PARAM_LEN = 6;
 const PTR_HDR_DATA_LEN = 8;
 
@@ -186,7 +188,7 @@ class S7Serializer extends Transform {
                 break;
 
             default:
-                return new Error(`Unknown request parameter function [${chunk.param.function}]`);
+                return new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown request parameter function [${chunk.param.function}]`);
         }
 
         buf.writeUInt16BE(parameterLength, PTR_HDR_PARAM_LEN);
@@ -277,7 +279,7 @@ class S7Serializer extends Transform {
                 break;
 
             default:
-                return new Error(`Unknown response parameter function [${chunk.param.function}]`);
+                return new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown response parameter function [${chunk.param.function}]`);
         }
 
         buf.writeUInt16BE(parameterLength, PTR_HDR_PARAM_LEN);
@@ -293,7 +295,7 @@ class S7Serializer extends Transform {
 
         if (chunk.param.method !== constants.proto.userData.method.REQUEST
             && chunk.param.method !== constants.proto.userData.method.RESPONSE) {
-            return new Error(`Unknown userData method [${chunk.param.method}]`);
+            return new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown userData method [${chunk.param.method}]`);
         }
 
         let isResMethod = chunk.param.method === constants.proto.userData.method.RESPONSE;
@@ -348,7 +350,7 @@ class S7Serializer extends Transform {
 
         //check if we have a header
         if (!chunk.header) {
-            cb(new Error('Missing telegram header'));
+            cb(new NodeS7Error('ERR_INVALID_ARGUMENT', 'Missing telegram header'));
             return;
         }
 
@@ -365,7 +367,7 @@ class S7Serializer extends Transform {
                 headerLength = 12;
                 break;
             default:
-                cb(new Error(`Unknown telegram type [${chunk.header.type}]`));
+                cb(new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown telegram type [${chunk.header.type}]`));
                 return;
         }
 

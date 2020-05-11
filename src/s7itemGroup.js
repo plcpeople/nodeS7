@@ -30,6 +30,7 @@ const debug = util.debuglog('nodes7');
 
 const S7Item = require('./s7item.js');
 const S7Endpoint = require('./s7endpoint.js');
+const NodeS7Error = require('./errors.js');
 
 class S7ItemGroup extends EventEmitter {
 
@@ -86,7 +87,7 @@ class S7ItemGroup extends EventEmitter {
 
         // we still don't have the pdu size, so abort computation
         if (!this._endpoint.pduSize) {
-            throw new Error('PDU Size not available for optimization (not connected to the PLC yet?)');
+            throw new NodeS7Error('ERR_ILLEGAL_STATE', 'PDU Size not available for optimization (not connected to the PLC yet?)');
         }
 
         this._readPackets = [];
@@ -355,7 +356,7 @@ class S7ItemGroup extends EventEmitter {
             //set the default one
             this._translationCallback = this._defaultTranslationCallback;
         } else {
-            throw new Error("Parameter must be a function");
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Parameter must be a function");
         }
     }
 
@@ -372,14 +373,14 @@ class S7ItemGroup extends EventEmitter {
         if (typeof tags === 'string') {
             tags = [tags];
         } else if (!Array.isArray(tags)) {
-            throw new Error("Parameter must be a string or an array of strings");
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Parameter must be a string or an array of strings");
         }
 
         for (const tag of tags) {
             debug("S7ItemGroup addItems item", tag);
 
             if (typeof tag !== 'string') {
-                throw new Error("Tags must be of string type");
+                throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Tags must be of string type");
             }
 
             let addr = this._translationCallback(tag);
@@ -430,7 +431,7 @@ class S7ItemGroup extends EventEmitter {
         if (typeof tags === 'string') {
             tags = [tags];
         } else if (!Array.isArray(tags)) {
-            throw new Error("Parameter tags must be a string or an array of strings");
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Parameter tags must be a string or an array of strings");
         }
 
         if (!Array.isArray(values)) {
@@ -438,7 +439,7 @@ class S7ItemGroup extends EventEmitter {
         }
 
         if (values.length !== tags.length) {
-            throw new Error("Number of tags must match the number of values");
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Number of tags must match the number of values");
         }
 
         // nothing to write
@@ -446,7 +447,7 @@ class S7ItemGroup extends EventEmitter {
 
         // not connected
         if (!this._endpoint.isConnected) {
-            throw new Error("Not connected");
+            throw new NodeS7Error('ERR_ILLEGAL_STATE', "Not connected");
         }
 
         const overheadPerItem = 16;
@@ -462,7 +463,7 @@ class S7ItemGroup extends EventEmitter {
             const value = values[i];
 
             if (typeof tag !== 'string') {
-                throw new Error("Tags must be of string type");
+                throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Tags must be of string type");
             }
 
             // find item on our list first, so we don't need to create a new one
@@ -477,7 +478,7 @@ class S7ItemGroup extends EventEmitter {
 
             // TODO - maybe we can split an item in multiple write request parts
             if (reqItemLength > maxPayloadSize) {
-                throw new Error(`Cannot write item with size greater than max payload of [${maxPayloadSize}]`);
+                throw new NodeS7Error('ERR_ITEM_TOO_BIG', `Cannot write item with size greater than max payload of [${maxPayloadSize}]`, { tag });
             }
 
             // create a new request if it doesn't fit in the current one
@@ -519,7 +520,7 @@ class S7ItemGroup extends EventEmitter {
                 let code = res.returnCode;
                 if (code !== constants.proto.retval.DATA_OK) {
                     let errDescr = constants.proto.retvalDesc[code] || '<Unknown return code>';
-                    throw new Error(`Write error [0x${code.toString(16)}]: ${errDescr}`);
+                    throw new NodeS7Error(code, `Write error [0x${code.toString(16)}]: ${errDescr}`);
                 }
             }
         }
@@ -564,13 +565,15 @@ class S7ItemGroup extends EventEmitter {
 
                 // check for empty response
                 if (!resPart) {
-                    throw new Error(`Empty response for request: Area [${reqPart.area}] DB [${reqPart.db}] Addr [${reqPart.address}] Len [${reqPart.length}]`);
+                    throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Empty response for request: Area [${reqPart.area}] DB [${reqPart.db}] Addr [${reqPart.address}] Len [${reqPart.length}]`
+                        , { area: reqPart.area, db: reqPart.db, address: reqPart.address, length: reqPart.length });
                 }
 
                 // check response's error code
                 if (resPart.returnCode != constants.proto.retval.DATA_OK) {
                     let errDesc = constants.proto.retvalDesc[resPart.returnCode] || `<Unknown error code ${resPart.returnCode}>`;
-                    throw new Error(`Error returned from request of Area [${reqPart.area}] DB [${reqPart.db}] Addr [${reqPart.address}] Len [${reqPart.length}]: "${errDesc}"`)
+                    throw new NodeS7Error(resPart.returnCode, `Error returned from request of Area [${reqPart.area}] DB [${reqPart.db}] Addr [${reqPart.address}] Len [${reqPart.length}]: "${errDesc}"`
+                        , { area: reqPart.area, db: reqPart.db, address: reqPart.address, length: reqPart.length })
                 }
 
                 // good to go, parse response

@@ -30,6 +30,7 @@ const debug = util.debuglog('nodes7');
 
 const S7Parser = require('./s7protocol/s7parser.js');
 const S7serializer = require('./s7protocol/s7serializer.js');
+const NodeS7Error = require('./errors.js');
 
 const CONN_NOT_INITIALIZED = 0;
 const CONN_CONNECTING = 1;
@@ -83,7 +84,7 @@ class S7Connection extends EventEmitter {
         super();
 
         if (stream.write === undefined) {
-            throw new Error('Underlying stream must support "write" calls');
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', 'Underlying stream must support "write" calls');
         }
 
         this.stream = stream;
@@ -184,7 +185,7 @@ class S7Connection extends EventEmitter {
         if (data.header.errorClass || data.header.errorCode) {
             let errCode = (data.header.errorClass << 8) | data.header.errorCode
             let errDesc = constants.proto.errorCodeDesc[errCode] || `<Unknown error code>`;
-            let err = new Error(`PLC error [0x${errCode.toString(16)}]: ${errDesc}`);
+            let err = new NodeS7Error(errCode, `PLC error [0x${errCode.toString(16)}]: ${errDesc}`);
 
             if (job) {
                 job.rej(err, data);
@@ -205,7 +206,7 @@ class S7Connection extends EventEmitter {
             data.param && data.param.function === constants.proto.function.COMM_SETUP) {
 
             if (this._connectionState != CONN_CONNECTING) {
-                this.emit('error', new Error(`Received a COMM_SETUP package while not in CONN_CONNECTING stage`));
+                this.emit('error', new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Received a COMM_SETUP package while not in CONN_CONNECTING stage`));
                 return;
             }
 
@@ -248,7 +249,7 @@ class S7Connection extends EventEmitter {
         let job = this._jobInProcess.get(pdu);
         this._jobInProcess.delete(pdu);
 
-        if (job) job.rej(new Error("Request timeout"));
+        if (job) job.rej(new NodeS7Error('ERR_TIMEOUT', "Request timeout"));
 
         /**
          * Emitted when a job times out. The job currently in
@@ -277,7 +278,7 @@ class S7Connection extends EventEmitter {
 
         if (this._jobInProcess.has(pdu)) {
             // should never happen
-            this.emit('error', new Error(`Pending job with PDU [${job.pdu}] conflicting with new job`));
+            this.emit('error', new NodeS7Error('ERR_ILLEGAL_STATE', `Pending job with PDU [${job.pdu}] conflicting with new job`, { pdu }));
         }
 
         this._jobInProcess.set(pdu, job);
@@ -323,7 +324,7 @@ class S7Connection extends EventEmitter {
         debug('S7Connection connect');
 
         if (this._connectionState > CONN_NOT_INITIALIZED) {
-            throw new Error("Already Initialized")
+            throw new NodeS7Error('ERR_ILLEGAL_STATE', "Already Initialized")
         }
 
         if (typeof cb === 'function') {
@@ -361,7 +362,7 @@ class S7Connection extends EventEmitter {
 
         this.clearQueue();
         this._jobInProcess.forEach(job => {
-            job.rej(new Error("Disconnected"));
+            job.rej(new NodeS7Error('ERR_DISCONNECTED', "Disconnected"));
             clearTimeout(job.timer);
         });
         this._jobInProcess.clear();
@@ -392,12 +393,12 @@ class S7Connection extends EventEmitter {
 
         return new Promise((res, rej) => {
             if (!msg.header) {
-                rej(new Error("Missing message header"));
+                rej(new NodeS7Error('ERR_INVALID_ARGUMENT', "Missing message header"));
                 return;
             }
 
             if (this._connectionState > CONN_CONNECTED) {
-                rej(new Error("Not connected"));
+                rej(new NodeS7Error('ERR_ILLEGAL_STATE', "Not connected"));
             }
 
             this._jobQueue.push({
@@ -459,9 +460,10 @@ class S7Connection extends EventEmitter {
 
             resMsg = await this.sendRaw(reqMsg);
 
-            if (resMsg.param.errorCode != constants.proto.error.OK) {
-                let errDesc = constants.proto.errorCodeDesc[resMsg.param.errorCode] || '<Unknown error code>'
-                throw new Error(`Unexpected error code reply on userdata response [${resMsg.param.errorCode}]: "${errDesc}"`);
+            let errCode = resMsg && resMsg.param && resMsg.param.errorCode;
+            if (errCode != constants.proto.error.OK) {
+                let errDesc = constants.proto.errorCodeDesc[errCode] || '<Unknown error code>'
+                throw new NodeS7Error(errCode, `Unexpected error code reply on userdata response [${errCode}]: "${errDesc}"`);
             }
 
             seqNum = resMsg.param.sequenceNumber;
@@ -484,7 +486,7 @@ class S7Connection extends EventEmitter {
         let oldQueue = this._jobQueue;
         this._jobQueue = [];
         for (const job of oldQueue) {
-            job.rej(new Error("Job interrupted"));
+            job.rej(new NodeS7Error('ERR_INTERRUPTED', "Job interrupted"));
         }
     }
 
@@ -543,7 +545,7 @@ class S7Connection extends EventEmitter {
             constants.proto.userData.subfunction.BLOCK_FUNC.LIST);
 
         if (res.length % 4) {
-            throw new Error(`Expecting blockCount response length to be multiple of 4 (got [${res.length}])`);
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Expecting blockCount response length to be multiple of 4 (got [${res.length}])`);
         }
 
         //create search index for block types from constants
@@ -559,7 +561,7 @@ class S7Connection extends EventEmitter {
 
             let blkType = blkTypeIdx.get(blkTypeId);
             if (!blkType) {
-                throw new Error(`Unknown block type id [${blkTypeId}] on buffer [${res.toString('hex')}]`);
+                throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown block type id [${blkTypeId}] on buffer [${res.toString('hex')}]`, {blkTypeId});
             }
 
             blockCount[blkType] = count;
@@ -580,18 +582,18 @@ class S7Connection extends EventEmitter {
         switch (typeof type) {
             case 'number':
                 if (isNaN(type) || type < 0 || type > 255) {
-                    throw new Error(`Invalid parameter for block type [${type}]`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Invalid parameter for block type [${type}]`);
                 }
                 blkTypeId = type;
                 break;
             case 'string':
                 blkTypeId = constants.proto.block.subtype[type.toUpperCase()];
                 if (blkTypeId === undefined) {
-                    throw new Error(`Unknown block type [${type}]`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown block type [${type}]`);
                 }
                 break;
             default:
-                throw new Error(`Unknown type for parameter block type [${type}]`);
+                throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown type for parameter block type [${type}]`);
         }
 
         let blkTypeString = blkTypeId.toString(16).padStart(2, '0').toUpperCase();
@@ -606,7 +608,7 @@ class S7Connection extends EventEmitter {
             constants.proto.userData.subfunction.BLOCK_FUNC.TYPE, req);
 
         if (res.length % 4) {
-            throw new Error(`Expecting listBlocks response length to be multiple of 4 (got [${res.length}])`);
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Expecting listBlocks response length to be multiple of 4 (got [${res.length}])`);
         }
 
         let blocks = []
@@ -634,18 +636,18 @@ class S7Connection extends EventEmitter {
         switch (typeof type) {
             case 'number':
                 if (isNaN(type) || type < 0 || type > 255) {
-                    throw new Error(`Invalid parameter for block type [${type}]`);
+                    throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Invalid parameter for block type [${type}]`);
                 }
                 blkTypeId = type;
                 break;
             case 'string':
                 blkTypeId = constants.proto.block.subtype[type.toUpperCase()];
                 if (blkTypeId === undefined) {
-                    throw new Error(`Unknown block type [${type}]`);
+                    throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown block type [${type}]`);
                 }
                 break;
             default:
-                throw new Error(`Unknown type for parameter block type [${type}]`);
+                throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown type for parameter block type [${type}]`);
         }
 
         let blkTypeString = blkTypeId.toString(16).padStart(2, '0').toUpperCase();
@@ -675,7 +677,7 @@ class S7Connection extends EventEmitter {
             constants.proto.userData.subfunction.TIME.READ);
 
         if (buffer.length !== 10) {
-            throw new Error(`Expecting 10 bytes as response from getTime, got [${buffer.length}]`);
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Expecting 10 bytes as response from getTime, got [${buffer.length}]`);
         }
 
         let offset = 0;
@@ -752,8 +754,9 @@ class S7Connection extends EventEmitter {
             }
         });
 
-        if (upStartRes.param.status !== 0) {
-            throw new Error(`Unexpected status [${upStartRes.param.status}] != 0 on uploadStart`);
+        let upStartStatusCode = upStartRes && upStartRes.param && upStartRes.param.status;
+        if (upStartStatusCode !== 0) {
+            throw new NodeS7Error(upStartStatusCode, `Unexpected status [${upStartStatusCode}] != 0 on uploadStart`);
         }
 
         let uploadId = upStartRes.param.uploadID;
@@ -766,7 +769,7 @@ class S7Connection extends EventEmitter {
         try {
 
             if (isNaN(blockLen)) {
-                throw new Error(`Unexpected value for total block length [${upStartRes.param.blockLength}] on uploadStart`);
+                throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unexpected value for total block length [${upStartRes.param.blockLength}] on uploadStart`);
             }
 
             let upRes, upResErr, upResMoreData;
@@ -789,7 +792,7 @@ class S7Connection extends EventEmitter {
                 debug('S7Connection uploadBlock upload-res', upRes.param.status, payload && payload.length);
 
                 if (upResErr) {
-                    throw new Error(`Unexpected error status [${upRes.param.status}] on upload`);
+                    throw new NodeS7Error(upRes.param.status, `Unexpected error status [${upRes.param.status}] on upload`);
                 }
 
                 blockParts.push(payload);
@@ -832,7 +835,7 @@ class S7Connection extends EventEmitter {
 
         let res = Buffer.concat(blockParts);
         if (res.length !== blockLen) {
-            throw new Error(`Size mismatch between informed length [${blockLen}] and received data [${res.length}]`);
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Size mismatch between informed length [${blockLen}] and received data [${res.length}]`);
         }
 
         return res;

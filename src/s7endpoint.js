@@ -30,6 +30,7 @@ const debug = util.debuglog('nodes7');
 const isoOnTcp = require('iso-on-tcp');
 
 const S7Connection = require('./s7connection.js');
+const NodeS7Error = require('./errors.js');
 
 const CONN_DISCONNECTED = 0;
 const CONN_CONNECTING = 1;
@@ -128,7 +129,7 @@ class S7Endpoint extends EventEmitter {
         // get and validate parameters
         if (this._connType == "tcp") {
             if (!opts.host) {
-                throw new Error("Parameter 'host' is required for 'tcp' type of connection");
+                throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Parameter 'host' is required for 'tcp' type of connection");
             }
 
             let dstTSAP;
@@ -150,7 +151,7 @@ class S7Endpoint extends EventEmitter {
             }
         } else if (this._connType == "mpi") {
             if (!opts.mpiAdapter) {
-                throw new Error("Parameter 'mpiAdapter' is required for 'mpi' type of connection");
+                throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Parameter 'mpiAdapter' is required for 'mpi' type of connection");
             }
 
             this._mpiAdapter = opts.mpiAdapter;
@@ -161,7 +162,7 @@ class S7Endpoint extends EventEmitter {
 
             this._connOptsS7.maxJobs = 1; // TODO FIXME a (maybe) bug in MpiAdapter prevents us to handle more than 1
         } else {
-            throw new Error(`Unknown type parameter "${opts.type}"`);
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown type parameter "${opts.type}"`);
         }
 
         this._initParams();
@@ -460,7 +461,7 @@ class S7Endpoint extends EventEmitter {
             if (this._connectionState === CONN_CONNECTED) {
                 res();
             } else if (this._connectionState === CONN_DISCONNECTING) {
-                rej(new Error("Can't connect when connection state is 'DISCONNECTING' "))
+                rej(new NodeS7Error('ERR_ILLEGAL_STATE', "Can't connect when connection state is 'DISCONNECTING' "))
             } else {
                 this.once('connect', res);
                 this.once('error', rej);
@@ -523,7 +524,7 @@ class S7Endpoint extends EventEmitter {
         debug('S7Endpoint readVars', items);
 
         if (this._connectionState !== CONN_CONNECTED) {
-            throw new Error("Not connected");
+            throw new NodeS7Error('ERR_NOT_CONNECTED', "Not connected");
         }
 
         let arr = [];
@@ -558,7 +559,7 @@ class S7Endpoint extends EventEmitter {
         debug('S7Endpoint readArea', area, address, length, db);
 
         if (this._connectionState !== CONN_CONNECTED) {
-            throw new Error("Not connected");
+            throw new NodeS7Error('ERR_NOT_CONNECTED', "Not connected");
         }
 
         let maxPayload = this._pduSize - 18; //protocol overhead
@@ -578,12 +579,12 @@ class S7Endpoint extends EventEmitter {
 
             let data = [];
             for (const res of results) {
-                if (res.length > 1) throw new Error("Illegal item count on PLC response");
+                if (res.length > 1) throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', "Illegal item count on PLC response");
 
                 let code = res[0].returnCode;
                 if (code !== constants.proto.retval.DATA_OK) {
                     let errDescr = constants.proto.retvalDesc[code] || '<Unknown return code>';
-                    throw new Error(`Read error [0x${code.toString(16)}]: ${errDescr}`);
+                    throw new NodeS7Error(code, `Read error [0x${code.toString(16)}]: ${errDescr}`);
                 }
 
                 // TODO should we check the transport of the response?
@@ -666,7 +667,7 @@ class S7Endpoint extends EventEmitter {
         debug('S7Endpoint writeMultiVars', items);
 
         if (this._connectionState !== CONN_CONNECTED) {
-            throw new Error("Not connected");
+            throw new NodeS7Error('ERR_NOT_CONNECTED', "Not connected");
         }
 
         let param = [], data = [];
@@ -706,7 +707,7 @@ class S7Endpoint extends EventEmitter {
         debug('S7Endpoint writeArea', area, address, data, db);
 
         if (this._connectionState !== CONN_CONNECTED) {
-            throw new Error("Not connected");
+            throw new NodeS7Error('ERR_NOT_CONNECTED', "Not connected");
         }
 
         let maxPayload = this._pduSize - 28; //protocol overhead
@@ -729,12 +730,12 @@ class S7Endpoint extends EventEmitter {
             debug('S7Endpoint writeArea response', results);
 
             for (const res of results) {
-                if (res.length > 1) throw new Error("Illegal item count on PLC response");
+                if (res.length > 1) throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', "Illegal item count on PLC response");
 
                 let code = res[0].returnCode;
                 if (code !== constants.proto.retval.DATA_OK) {
                     let errDescr = constants.proto.retvalDesc[code] || '<Unknown return code>';
-                    throw new Error(`Write error [0x${code.toString(16)}]: ${errDescr}`);
+                    throw new NodeS7Error(code, `Write error [0x${code.toString(16)}]: ${errDescr}`);
                 }
             }
         });
@@ -869,22 +870,22 @@ class S7Endpoint extends EventEmitter {
         switch (typeof type) {
             case 'number':
                 if (isNaN(type) || type < 0 || type > 255) {
-                    throw new Error(`Invalid parameter for block type [${type}]`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Invalid parameter for block type [${type}]`);
                 }
                 blkTypeId = type;
                 break;
             case 'string':
                 blkTypeId = constants.proto.block.subtype[type.toUpperCase()];
                 if (blkTypeId === undefined) {
-                    throw new Error(`Unknown block type [${type}]`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown block type [${type}]`);
                 }
                 break;
             default:
-                throw new Error(`Unknown type for parameter block type [${type}]`);
+                throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown type for parameter block type [${type}]`);
         }
 
         if (!['A', 'P', 'B'].includes(filesystem)) {
-            throw new Error(`Unknown filesystem [${filesystem}]`);
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Unknown filesystem [${filesystem}]`);
         }
 
         let fileId = headerOnly ? '$' : '_';
@@ -920,14 +921,14 @@ class S7Endpoint extends EventEmitter {
         let resIdx = res.readUInt16BE(2);
 
         if (strict && (resId !== id || resIdx !== index)) {
-            throw new Error(`SSL ID/Index mismatch, requested [${id}]/[${index}], got [${resId}]/[${resIdx}]`);
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `SSL ID/Index mismatch, requested [${id}]/[${index}], got [${resId}]/[${resIdx}]`, { resId, resIdx });
         }
 
         let entryLength = res.readUInt16BE(4);
         let entryCount = res.readUInt16BE(6);
 
         if (entryLength * entryCount !== res.length - 8) {
-            throw new Error(`Size mismatch, expecting [${entryCount}] x [${entryLength}] + 8, got [${res.length}]`);
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Size mismatch, expecting [${entryCount}] x [${entryLength}] + 8, got [${res.length}]`, { entryCount, entryLength });
         }
 
         let retArray = [];
@@ -965,7 +966,7 @@ class S7Endpoint extends EventEmitter {
         let moduleInfo = {};
 
         for (const buf of res) {
-            if (buf.length != 28) throw new Error(`Unexpected buffer size of [${buf.length}] != 28`);
+            if (buf.length != 28) throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unexpected buffer size of [${buf.length}] != 28`);
 
             // we're intentionally lefting the version/id fields out. Many ways of representing
             // this info were seen on the wild and finding a way to correctly parse all of

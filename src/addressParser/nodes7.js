@@ -27,6 +27,8 @@ const debug = util.debuglog('nodes7');
 //@ts-ignore
 const constants = require('../constants.json');
 
+const NodeS7Error = require('../errors.js');
+
 /**
  * Regex to match the address format of addresses
  * Match 1: DB Number
@@ -45,13 +47,23 @@ class AddressParserNodeS7 {
     /**
      * 
      * @param {string} address the address to be parsed
+     * @throws ERR_PARSE_UNKNOWN_FORMAT
+     * @throws ERR_PARSE_ADDR_OFFSET
+     * @throws ERR_PARSE_DB_NUMBER
+     * @throws ERR_PARSE_DB_DATATYPE
+     * @throws ERR_PARSE_AREA
+     * @throws ERR_PARSE_DATATYPE
+     * @throws ERR_PARSE_BIT_OFFSET
+     * @throws ERR_PARSE_STRING_LEN
+     * @throws ERR_PARSE_INVALID_BIT_OFFSET
+     * @throws ERR_PARSE_INVALID_ARR_LEN
      */
     parse(address) {
         debug("S7Item parseAddress_NodeS7", address);
 
         let match = address.match(REGEX_NODES7_ADDR);
         if (!match) {
-            throw new Error(`Could not parse item "${address}", invalid address format`);
+            throw new NodeS7Error('ERR_PARSE_UNKNOWN_FORMAT', `Could not parse item "${address}", invalid address format`, { item: address });
         }
 
         debug("S7Item parseAddress_NodeS7 match", match);
@@ -74,7 +86,7 @@ class AddressParserNodeS7 {
         // test address offset
         addressOffset = parseInt(match_addr)
         if (isNaN(addressOffset)) {
-            throw new Error(`Invalid address offset on "${address}"`);
+            throw new NodeS7Error('ERR_PARSE_ADDR_OFFSET', `Invalid address offset on "${address}"`, { item: address });
         }
 
         // parse DB number
@@ -82,7 +94,7 @@ class AddressParserNodeS7 {
             dbNumber = parseInt(match_db);
 
             if (dbNumber < 1 || isNaN(dbNumber)) {
-                throw new Error(`Invalid DB Number on "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_DB_NUMBER', `Invalid DB Number on "${address}"`, { item: address });
             }
         }
 
@@ -134,7 +146,7 @@ class AddressParserNodeS7 {
                     dataType = "REAL";
                     break;
                 default:
-                    throw new Error(`Unknown DB data type "${match_area}" for address "${address}"`);
+                    throw new NodeS7Error('ERR_PARSE_DB_DATATYPE', `Unknown DB data type "${match_area}" for address "${address}"`, { item: address });
             }
 
         } else {
@@ -159,7 +171,7 @@ class AddressParserNodeS7 {
                 case "C":
                     break;
                 default:
-                    throw new Error(`Unknown address type "${addrType}" for address "${address}"`);
+                    throw new NodeS7Error('ERR_PARSE_AREA', `Unknown address type "${addrType}" for address "${address}"`, { item: address });
             }
 
             // validate data type
@@ -196,17 +208,17 @@ class AddressParserNodeS7 {
                     dataType = "REAL";
                     break;
                 default:
-                    throw new Error(`Unknown data type "${dataType}" for address "${address}"`);
+                    throw new NodeS7Error('ERR_PARSE_DATATYPE', `Unknown data type "${dataType}" for address "${address}"`, { item: address });
             }
         }
 
         // handle array lengths and bit address
         if (dataType === "X") {
             if (isNaN(match_bitAddr)) {
-                throw new Error(`Bit address offset required for data type "X" on "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_BIT_OFFSET', `Bit address offset required for data type "X" on "${address}"`, { item: address });
             }
             if (match_bitAddr > 7) {
-                throw new Error(`Bit address offset out of range 0-7 on "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_BIT_OFFSET', `Bit address offset out of range 0-7 on "${address}"`, { item: address });
             }
 
             bitAddressOffset = match_bitAddr;
@@ -219,7 +231,7 @@ class AddressParserNodeS7 {
         } else if (dataType === "STRING") {
             // match_bitAddr is the string length for string types
             if (isNaN(match_bitAddr) || match_bitAddr < 1) {
-                throw new Error(`String length required for data type "STRING" on "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_STRING_LEN', `String length required for data type "STRING" on "${address}"`, { item: address });
             }
 
             dataTypeLength = match_bitAddr + 2; //strings have 2 extra bytes for string length
@@ -233,7 +245,7 @@ class AddressParserNodeS7 {
         } else {
             if (!isNaN(match_arrLen)) {
                 // the array length should be at the bitAddr field, this is a syntax error
-                throw new Error(`Invalid use of bit address offset on "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_INVALID_BIT_OFFSET', `Invalid use of bit address offset on "${address}"`, { item: address });
             }
 
             bitAddressOffset = 0;
@@ -243,7 +255,7 @@ class AddressParserNodeS7 {
                 arrayLength = match_bitAddr;
 
                 if (arrayLength < 1) {
-                    throw new Error(`Invalid array length on "${address}"`);
+                    throw new NodeS7Error('ERR_PARSE_INVALID_ARR_LEN', `Invalid array length on "${address}"`, { item: address });
                 }
             } else {
                 arrayLength = 1;
@@ -280,7 +292,7 @@ class AddressParserNodeS7 {
                 break;
             default:
                 // we have validated the dataType before, so we should never reach this
-                throw new Error(`Cannot determine the length of type "${dataType}" for address "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_DATATYPE', `Cannot determine the length of type "${dataType}" for address "${address}"`, { item: address });
         }
 
         // set area/transport codes accordingly
@@ -317,7 +329,7 @@ class AddressParserNodeS7 {
                 readTransportCode = constants.proto.transport.DATE;
                 break;
             default:
-                throw new Error(`Cannot determine area codes for address "${address}"`);
+                throw new NodeS7Error('ERR_PARSE_AREA', `Cannot determine area codes for address "${address}"`, { item: address });
         }
 
         if (dataType === 'X') {

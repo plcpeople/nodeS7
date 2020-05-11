@@ -29,6 +29,7 @@ const util = require('util');
 const debug = util.debuglog('nodes7');
 
 const AddressParserNodeS7 = require('./addressParser/nodes7.js');
+const NodeS7Error = require('./errors.js');
 
 class S7Item extends EventEmitter {
 
@@ -205,7 +206,7 @@ class S7Item extends EventEmitter {
         } else {
             if (this._props.arrayLength > 1) {
                 if (!Array.isArray(value) || this._props.arrayLength !== value.length) {
-                    throw new Error(`Expected [${this._props.arrayLength}] values for this item`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Expected [${this._props.arrayLength}] values for this item`);
                 }
 
                 let ptr = 0
@@ -249,22 +250,23 @@ class S7Item extends EventEmitter {
         debug('S7Item readValueFromResponse', this._string, res);
 
         if (!req) {
-            throw new Error("Missing request data");
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', "Missing request data");
         }
 
         if (!res || !res.data) {
-            throw new Error("No data present for parsing the item's value");
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', "No data present for parsing the item's value");
         }
 
         // check response's error code
         if (res.returnCode != constants.proto.retval.DATA_OK) {
             let errDesc = constants.proto.retvalDesc[res.returnCode] || `<Unknown error code ${res.returnCode}>`;
-            throw new Error(`Error returned from request of Area [${res.area}] DB [${res.db}] Addr [${res.address}] Len [${res.length}]: "${errDesc}"`)
+            throw new NodeS7Error(res.returnCode, `Error returned from request of Area [${res.area}] DB [${res.db}] Addr [${res.address}] Len [${res.length}]: "${errDesc}"`
+                , { area: res.area, db: res.db, address: res.address, length: res.length })
         }
 
         let offsets = this._getCopyBufferOffsets(req.address, res.data.length);
         if (!offsets) {
-            throw new Error("No matching data for this request");
+            throw new NodeS7Error('ERR_UNEXPECTED_RESPONSE', "No matching data for this request");
         }
         this._copyFromBuffer(res.data, offsets);
     }
@@ -382,11 +384,11 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
         case "INT":
         case "WORD":
         case "BYTE":
-            if (typeof data !== 'number') throw new Error(`Data for item of type '${type}' must be a number`);
+            if (typeof data !== 'number') throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Data for item of type '${type}' must be a number`);
             break;
         case "CHAR":
         case "STRING":
-            if (typeof data !== 'string') throw new Error(`Data for item of type '${type}' must be a string`);
+            if (typeof data !== 'string') throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Data for item of type '${type}' must be a string`);
             break;
         case "X":
             //everything is valid here, JS rules for boolean conversion will apply
@@ -398,7 +400,7 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
                     // is between "1990-01-01T00:00:00.000Z" and "2089-12-31T23:59:59.999Z" in JS epoch
                     data = new Date(data);
                 } else {
-                    throw new Error(`Data for item of type '${type} must be instance of Data`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Data for item of type '${type} must be instance of Data`);
                 }
             }
             break;
@@ -410,12 +412,12 @@ function bufferWriteByDataType(buffer, data, type, offset, length = 1) {
                     // as per type's range definition
                     data = new Date(data);
                 } else {
-                    throw new Error(`Data for item of type '${type} must be instance of Data`);
+                    throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Data for item of type '${type} must be instance of Data`);
                 }
             }
             break;
         default:
-            throw new Error(`Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`);
+            throw new NodeS7Error('ERR_INVALID_ARGUMENT', `Cannot parse data of unknown type "${this._props.datatype}" for item "${this._string}"`, { name: this._string });
     }
 
 

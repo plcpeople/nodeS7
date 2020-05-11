@@ -28,6 +28,8 @@ const constants = require('../constants.json');
 const util = require('util');
 const debug = util.debuglog('nodes7');
 
+const NodeS7Error = require('../errors.js');
+
 class S7Parser extends Transform {
 
     constructor(opts) {
@@ -58,7 +60,7 @@ class S7Parser extends Transform {
                 for (let i = 0; i < itemCount; i++) {
                     let varSpec = chunk.readUInt8(offset);
                     if (varSpec != constants.proto.VAR_SPEC) {
-                        return new Error(`Unknown variable specification [${varSpec}]`);
+                        return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown variable specification [${varSpec}]`);
                     }
 
                     //TODO - we're skipping the length (but checking the variable specification) - should we check this too?
@@ -124,12 +126,12 @@ class S7Parser extends Transform {
                 offset += 2;
                 break;
             default:
-                return new Error(`Unknown request parameter function [${obj.function}]`);
+                return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown request parameter function [${obj.function}]`);
         }
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the parameters area
-            return new Error(`Parser overflow reading request parameter [${offset}] > [${offsetStart + length}]`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Parser overflow reading request parameter [${offset}] > [${offsetStart + length}]`);
         }
 
         return obj;
@@ -179,12 +181,12 @@ class S7Parser extends Transform {
                 offset += 2;
                 break;
             default:
-                return new Error(`Unknown response parameter function [${obj.function}]`);
+                return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown response parameter function [${obj.function}]`);
         }
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the parameters area
-            return new Error(`Parser overflow reading response parameter [${offset}] > [${offsetStart + length}]`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Parser overflow reading response parameter [${offset}] > [${offsetStart + length}]`);
         }
 
         return obj;
@@ -199,7 +201,7 @@ class S7Parser extends Transform {
         offset += 3;
 
         if (head !== 0x000112) {
-            return new Error(`Unknown header value [0x${head.toString(16)}] != 0x000112`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown header value [0x${head.toString(16)}] != 0x000112`);
         }
 
         let paramLength = chunk.readUInt8(offset);
@@ -225,7 +227,7 @@ class S7Parser extends Transform {
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
-            return new Error(`Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
         }
 
         return obj;
@@ -265,13 +267,13 @@ class S7Parser extends Transform {
                 }
                 break;
             default:
-                return new Error(`Don't know how to parse the data section of request function [${obj.function}]`);
+                return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Don't know how to parse the data section of request function [${obj.function}]`);
 
         }
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
-            return new Error(`Parser overflow reading request data section [${offset}] > [${offsetStart + length}]`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Parser overflow reading request data section [${offset}] > [${offsetStart + length}]`);
         }
 
         return obj;
@@ -304,7 +306,7 @@ class S7Parser extends Transform {
                 obj.items = [];
                 for (let i = 0; i < param.itemCount; i++) {
                     if (chunk.length - offset < 4) {
-                        return new Error(`Malformed READ_VAR response data, expecting at least 4 bytes parsing item [${i}]`);
+                        return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Malformed READ_VAR response data, expecting at least 4 bytes parsing item [${i}]`);
                     }
 
                     let returnCode = chunk.readUInt8(offset);
@@ -315,9 +317,9 @@ class S7Parser extends Transform {
                     offset += 2;
                     if (returnCode !== constants.proto.retval.DATA_OK &&
                         transportSize === constants.proto.dataTransport.NULL) {
-                            //we shouldn't expect any data with error on return code
-                            // and null transport, although the PLC may report some length
-                            itemLenBytes = 0;
+                        //we shouldn't expect any data with error on return code
+                        // and null transport, although the PLC may report some length
+                        itemLenBytes = 0;
                     } else if (transportSize === constants.proto.dataTransport.BBIT ||
                         transportSize === constants.proto.dataTransport.BBYTE ||
                         transportSize === constants.proto.dataTransport.BINT) {
@@ -337,13 +339,13 @@ class S7Parser extends Transform {
                 }
                 break;
             default:
-                return new Error(`Don't know how to parse the data section of response function [${obj.function}]`);
+                return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Don't know how to parse the data section of response function [${obj.function}]`);
 
         }
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
-            return new Error(`Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
         }
 
         return obj;
@@ -369,7 +371,7 @@ class S7Parser extends Transform {
 
         if (offset > offsetStart + length) {
             //safe check that we haven't read more than the length of the data area
-            return new Error(`Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
+            return new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Parser overflow reading response data section [${offset}] > [${offsetStart + length}]`);
         }
 
         return obj;
@@ -405,7 +407,7 @@ class S7Parser extends Transform {
                 let protocolID = chunk.readUInt8(ptr);
                 if (protocolID !== constants.proto.ID) {
                     debug("S7Parser _transform err-unknown-proto-id", protocolID);
-                    cb(new Error(`Unknown protocol ID [${protocolID}]`));
+                    cb(new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown protocol ID [${protocolID}]`));
                     return;
                 }
                 ptr += 1;
@@ -449,7 +451,7 @@ class S7Parser extends Transform {
                             break;
                         default:
                             debug("S7Parser _transform err-unknown-header-type", header.type);
-                            cb(new Error(`Unknown header type [${header.type}]`));
+                            cb(new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown header type [${header.type}]`));
                             return;
                     }
 
@@ -479,7 +481,7 @@ class S7Parser extends Transform {
                             break;
                         default:
                             debug("S7Parser _transform err-unknown-header-type", header.type);
-                            cb(new Error(`Unknown header type [${header.type}]`));
+                            cb(new NodeS7Error('ERR_UNEXPECTED_RESPONSE', `Unknown header type [${header.type}]`));
                             return;
                     }
 
