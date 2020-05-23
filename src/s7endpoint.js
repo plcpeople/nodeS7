@@ -209,7 +209,7 @@ class S7Endpoint extends EventEmitter {
             this._transport = isoOnTcp.createConnection(this._connOptsTcp, () => {
                 if (this._connection) this._connection.connect();
             });
-            this._connectS7();
+            this._createS7Connection();
         } else if (this._connType == 'mpi') {
 
             if (!this._mpiAdapter.isConnected) {
@@ -222,7 +222,7 @@ class S7Endpoint extends EventEmitter {
             let mpiAddr = this._connOptsMpi.mpiAddress;
             this._mpiAdapter.createStream(mpiAddr, this._connOptsMpi).then(stream => {
                 this._transport = stream;
-                this._connectS7();
+                this._createS7Connection();
                 this._connection.connect();
             }).catch(e => this._onMpiAdapterError(e));
         }
@@ -233,8 +233,8 @@ class S7Endpoint extends EventEmitter {
      * with the PLC through the "this._transport" socket
      * @private
      */
-    _connectS7() {
-        debug("S7Endpoint _connectS7");
+    _createS7Connection() {
+        debug("S7Endpoint _createS7Connection");
 
         this._transport.on('error', e => this._onTransportError(e));
         this._transport.on('close', () => this._onTransportClose());
