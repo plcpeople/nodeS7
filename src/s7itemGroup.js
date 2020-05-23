@@ -419,8 +419,16 @@ class S7ItemGroup extends EventEmitter {
     /**
      * Writes the provided items with the provided values on the PLC
      * 
+     * Writing items whose payload's size is bigger than the max packet 
+     * size allowed by the PLC is intentionally not supported. This 
+     * would need to be split among multiple packets and could cause issues
+     * on the PLC depending on the programmed logic. You'll need to write 
+     * items individually, and if synchronization is an issue, to write 
+     * additional logic on the PLC for synchronization
+     * 
      * @param {string|Array<string>} tags 
      * @param {*|Array<*>} values 
+     * @throws {NodeS7Error} ERR_ITEM_TOO_BIG - when the item being written does not fit a single write request
      */
     async writeItems(tags, values) {
         debug("S7ItemGroup writeItems", tags, values);
@@ -447,7 +455,7 @@ class S7ItemGroup extends EventEmitter {
 
         // not connected
         if (!this._endpoint.isConnected) {
-            throw new NodeS7Error('ERR_ILLEGAL_STATE', "Not connected");
+            throw new NodeS7Error('ERR_NOT_CONNECTED', "Not connected");
         }
 
         const overheadPerItem = 16;

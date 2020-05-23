@@ -1,6 +1,33 @@
 ## Classes
 
 <dl>
+<dt><a href="#NodeS7Error">NodeS7Error</a></dt>
+<dd><p>Custom NodeS7 Error class that tries to export the root-cause of an error by 
+extending the built-in Error class with a <code>code</code> and an <code>info</code> property.</p>
+<p>The <code>code</code> property is always populated, and can be of type &quot;string&quot;, when
+caused by internal checks of the library, or of type &quot;number&quot; when caused
+by a faulty error code from the PLC.</p>
+<p>Here is a list of the error codes that can be thrown by the library itself:</p>
+<ul>
+<li><code>ERR_ILLEGAL_STATE</code>: Internal condition required for executing an action is not fulfilled</li>
+<li><code>ERR_INTERRUPTED</code>: Pending job has been interrupted (e.g. by a disconnection)</li>
+<li><code>ERR_INVALID_ARGUMENT</code>: A supplied parameter of a called function is out of specification </li>
+<li><code>ERR_ITEM_TOO_BIG</code>: Item being written does not fit a single write request</li>
+<li><code>ERR_NOT_CONNECTED</code>: Trying to perform an operation that requires communication to the PLC, but no connection is currently established</li>
+<li><code>ERR_PARSE_ADDR_OFFSET</code>: Address parsing: Byte offset of an address is invalid</li>
+<li><code>ERR_PARSE_AREA</code>: Address parsing: Area addressed is unknown or invalid</li>
+<li><code>ERR_PARSE_BIT_OFFSET</code>: Address parsing: Bit offset is missing or is invalid</li>
+<li><code>ERR_PARSE_DATATYPE</code>: Address parsing: Datatype is unknown or invalid</li>
+<li><code>ERR_PARSE_DB_DATATYPE</code>: Address parsing: Datatype of a DB area is unknown or invalid</li>
+<li><code>ERR_PARSE_DB_NUMBER</code>: Address parsing: Number of a DB is unknown or invalid</li>
+<li><code>ERR_PARSE_INVALID_ARR_LEN</code>: Address parsing: Array length of an array specification is invalid</li>
+<li><code>ERR_PARSE_INVALID_BIT_OFFSET</code>: Address parsing: Bit offset is specified in a type that doesn&#39;t support it</li>
+<li><code>ERR_PARSE_STRING_LEN</code>: Address parsing: String length specified is missing or is invalid</li>
+<li><code>ERR_PARSE_UNKNOWN_FORMAT</code>: Address parsing: Basic format of a NODES7 address format cannot be identified</li>
+<li><code>ERR_TIMEOUT</code>: Communication timeout</li>
+<li><code>ERR_UNEXPECTED_RESPONSE</code>: Unexpected or invalid data received from the device. Usually causes the current connection to be terminated</li>
+</ul>
+</dd>
 <dt><a href="#S7Connection">S7Connection</a></dt>
 <dd></dd>
 <dt><a href="#S7Endpoint">S7Endpoint</a></dt>
@@ -32,6 +59,64 @@ allowing to call methods that act on it</p>
 <dd></dd>
 </dl>
 
+<a name="NodeS7Error"></a>
+
+## NodeS7Error
+Custom NodeS7 Error class that tries to export the root-cause of an error by 
+extending the built-in Error class with a `code` and an `info` property.
+
+The `code` property is always populated, and can be of type "string", when
+caused by internal checks of the library, or of type "number" when caused
+by a faulty error code from the PLC.
+
+Here is a list of the error codes that can be thrown by the library itself:
+ - `ERR_ILLEGAL_STATE`: Internal condition required for executing an action is not fulfilled
+ - `ERR_INTERRUPTED`: Pending job has been interrupted (e.g. by a disconnection)
+ - `ERR_INVALID_ARGUMENT`: A supplied parameter of a called function is out of specification 
+ - `ERR_ITEM_TOO_BIG`: Item being written does not fit a single write request
+ - `ERR_NOT_CONNECTED`: Trying to perform an operation that requires communication to the PLC, but no connection is currently established
+ - `ERR_PARSE_ADDR_OFFSET`: Address parsing: Byte offset of an address is invalid
+ - `ERR_PARSE_AREA`: Address parsing: Area addressed is unknown or invalid
+ - `ERR_PARSE_BIT_OFFSET`: Address parsing: Bit offset is missing or is invalid
+ - `ERR_PARSE_DATATYPE`: Address parsing: Datatype is unknown or invalid
+ - `ERR_PARSE_DB_DATATYPE`: Address parsing: Datatype of a DB area is unknown or invalid
+ - `ERR_PARSE_DB_NUMBER`: Address parsing: Number of a DB is unknown or invalid
+ - `ERR_PARSE_INVALID_ARR_LEN`: Address parsing: Array length of an array specification is invalid
+ - `ERR_PARSE_INVALID_BIT_OFFSET`: Address parsing: Bit offset is specified in a type that doesn't support it
+ - `ERR_PARSE_STRING_LEN`: Address parsing: String length specified is missing or is invalid
+ - `ERR_PARSE_UNKNOWN_FORMAT`: Address parsing: Basic format of a NODES7 address format cannot be identified
+ - `ERR_TIMEOUT`: Communication timeout
+ - `ERR_UNEXPECTED_RESPONSE`: Unexpected or invalid data received from the device. Usually causes the current connection to be terminated
+
+**Kind**: global class  
+
+* [NodeS7Error](#NodeS7Error)
+    * [new NodeS7Error(code, message, [info])](#new_NodeS7Error_new)
+    * [.code](#NodeS7Error+code) : <code>number</code> \| <code>string</code>
+    * [.info](#NodeS7Error+info) : <code>object</code>
+
+<a name="new_NodeS7Error_new"></a>
+
+### new NodeS7Error(code, message, [info])
+Encapsulates an error, whether caused from a return code from the PLC or
+internally in the library, identified by a code for it and an optional info
+about the cause of the error
+
+
+| Param | Type | Description |
+| --- | --- | --- |
+| code | <code>number</code> \| <code>string</code> | the error code. numeric codes are from PLC responses, string codes are generated internally |
+| message | <code>string</code> | the error message |
+| [info] | <code>object</code> | Object containing additional info about the causes of the error. May not be always available |
+
+<a name="NodeS7Error+code"></a>
+
+### nodeS7Error.code : <code>number</code> \| <code>string</code>
+**Kind**: instance property of [<code>NodeS7Error</code>](#NodeS7Error)  
+<a name="NodeS7Error+info"></a>
+
+### nodeS7Error.info : <code>object</code>
+**Kind**: instance property of [<code>NodeS7Error</code>](#NodeS7Error)  
 <a name="S7Connection"></a>
 
 ## S7Connection
@@ -788,7 +873,18 @@ Removes an item or a group of items to be read from "readAllItems"
 ### s7ItemGroup.writeItems(tags, values)
 Writes the provided items with the provided values on the PLC
 
+Writing items whose payload's size is bigger than the max packet 
+size allowed by the PLC is intentionally not supported. This 
+would need to be split among multiple packets and could cause issues
+on the PLC depending on the programmed logic. You'll need to write 
+items individually, and if synchronization is an issue, to write 
+additional logic on the PLC for synchronization
+
 **Kind**: instance method of [<code>S7ItemGroup</code>](#S7ItemGroup)  
+**Throws**:
+
+- [<code>NodeS7Error</code>](#NodeS7Error) ERR_ITEM_TOO_BIG - when the item being written does not fit a single write request
+
 
 | Param | Type |
 | --- | --- |

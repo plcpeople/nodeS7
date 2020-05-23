@@ -47,16 +47,16 @@ class AddressParserNodeS7 {
     /**
      * 
      * @param {string} address the address to be parsed
-     * @throws ERR_PARSE_UNKNOWN_FORMAT
-     * @throws ERR_PARSE_ADDR_OFFSET
-     * @throws ERR_PARSE_DB_NUMBER
-     * @throws ERR_PARSE_DB_DATATYPE
-     * @throws ERR_PARSE_AREA
-     * @throws ERR_PARSE_DATATYPE
-     * @throws ERR_PARSE_BIT_OFFSET
-     * @throws ERR_PARSE_STRING_LEN
-     * @throws ERR_PARSE_INVALID_BIT_OFFSET
-     * @throws ERR_PARSE_INVALID_ARR_LEN
+     * @throws {NodeS7Error} ERR_PARSE_ADDR_OFFSET - Byte offset of an address is invalid
+     * @throws {NodeS7Error} ERR_PARSE_AREA - Area addressed is unknown or invalid
+     * @throws {NodeS7Error} ERR_PARSE_BIT_OFFSET - Bit offset is missing or is invalid
+     * @throws {NodeS7Error} ERR_PARSE_DATATYPE - Datatype is unknown or invalid
+     * @throws {NodeS7Error} ERR_PARSE_DB_DATATYPE - Datatype of a DB area is unknown or invalid
+     * @throws {NodeS7Error} ERR_PARSE_DB_NUMBER - Number of a DB is unknown or invalid
+     * @throws {NodeS7Error} ERR_PARSE_INVALID_ARR_LEN - Array length of an array specification is invalid
+     * @throws {NodeS7Error} ERR_PARSE_INVALID_BIT_OFFSET - Bit offset is specified in a type that doesn't support it
+     * @throws {NodeS7Error} ERR_PARSE_STRING_LEN - String length specified is missing or is invalid
+     * @throws {NodeS7Error} ERR_PARSE_UNKNOWN_FORMAT - Basic format of a NODES7 address format cannot be identified
      */
     parse(address) {
         debug("S7Item parseAddress_NodeS7", address);
