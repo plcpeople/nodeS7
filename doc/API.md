@@ -807,6 +807,7 @@ Large items may need multiple requests to read the whole memory area.
 
 * [S7ItemGroup](#S7ItemGroup)
     * [new S7ItemGroup(s7endpoint, [opts])](#new_S7ItemGroup_new)
+    * [.destroy()](#S7ItemGroup+destroy)
     * [.setTranslationCB(func)](#S7ItemGroup+setTranslationCB)
     * [.addItems(tags)](#S7ItemGroup+addItems)
     * [.removeItems(tags)](#S7ItemGroup+removeItems)
@@ -824,6 +825,13 @@ Large items may need multiple requests to read the whole memory area.
 | [opts.skipOptimization] | <code>boolean</code> | <code>false</code> | whether item optimization should be skipped |
 | [opts.optimizationGap] | <code>number</code> | <code>5</code> | how many bytes away from the last item we may still try to optimize |
 
+<a name="S7ItemGroup+destroy"></a>
+
+### s7ItemGroup.destroy()
+Destroys this intance, releasing the used resources and 
+the references on S7Endpoint
+
+**Kind**: instance method of [<code>S7ItemGroup</code>](#S7ItemGroup)  
 <a name="S7ItemGroup+setTranslationCB"></a>
 
 ### s7ItemGroup.setTranslationCB(func)

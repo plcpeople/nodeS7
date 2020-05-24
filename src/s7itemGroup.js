@@ -53,7 +53,20 @@ class S7ItemGroup extends EventEmitter {
         this._optimizationGap = opts.optimizationGap || 5;
         this._initParams();
 
-        this._endpoint.on('pdu-size', () => this._invalidateReadPackets());
+        this._funcInvalidateReadPackets = () => this._invalidateReadPackets();
+        this._endpoint.on('pdu-size', this._funcInvalidateReadPackets);
+    }
+
+    /**
+     * Destroys this intance, releasing the used resources and 
+     * the references on S7Endpoint
+     */
+    destroy() {
+        debug('S7ItemGroup destroy');
+        this._endpoint.removeListener('pdu-size', this._funcInvalidateReadPackets);
+        this._endpoint = null;
+        this._readPackets = null;
+        this._items.clear();
     }
 
     /**
@@ -66,7 +79,6 @@ class S7ItemGroup extends EventEmitter {
         this._readPackets = null;
         this._translationCallback = this._defaultTranslationCallback;
         this._lastRequestTime = null;
-        this._lastResponseTime = null;
     }
 
     /**
@@ -436,6 +448,10 @@ class S7ItemGroup extends EventEmitter {
         // don't do write optimizations, until we're
         // very sure on what we're doing
 
+        if (this._endpoint === null){
+            throw new Error('Already destroyed');
+        }
+
         if (typeof tags === 'string') {
             tags = [tags];
         } else if (!Array.isArray(tags)) {
@@ -539,6 +555,10 @@ class S7ItemGroup extends EventEmitter {
      */
     async readAllItems() {
         debug("S7ItemGroup readAllItems");
+
+        if (this._endpoint === null) {
+            throw new Error('Already destroyed');
+        }
 
         let result = {};
 
