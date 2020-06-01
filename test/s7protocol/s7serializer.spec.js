@@ -423,6 +423,41 @@ describe('S7Protocol Serializer', () => {
         });
     });
 
+    it('should encode a Request -> WriteVar (bit item)', (done) => {
+        let serializer = new S7Serializer();
+        serializer.on('data', (data) => {
+            //expect(data.toString('hex')).to.be.equal('320100000003000e00050501120a100100010001840000000003000101');
+            expect(data.toString('hex')).to.be.equal('320100000003000e00060501120a10010001000184000000000300010100');
+            done();
+        });
+
+        serializer.write({
+            header: {
+                type: constants.proto.type.REQUEST,
+                rid: 0,
+                pduReference: 3
+            },
+            param: {
+                function: constants.proto.function.WRITE_VAR,
+                items: [{
+                    syntax: constants.proto.syntax.S7ANY,
+                    transport: constants.proto.transport.BIT,
+                    area: constants.proto.area.DB,
+                    db: 1,
+                    address: 0,
+                    length: 1
+                }]
+            },
+            data: {
+                items: [{
+                    returnCode: 0,
+                    transportSize: constants.proto.dataTransport.BBIT,
+                    data: Buffer.from('01', 'hex')
+                }]
+            }
+        });
+    });
+
     it('should encode a Request -> WriteVar (multi-item)', (done) => {
         let serializer = new S7Serializer();
         serializer.on('data', (data) => {
