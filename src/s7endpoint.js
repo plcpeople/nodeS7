@@ -659,8 +659,8 @@ class S7Endpoint extends EventEmitter {
      * @param {number} items[].transport the transport length
      * @param {number} items[].address the address where to read from
      * @param {number} items[].length the number of elements to read (according to transport)
-     * @param {number} items[].dataTransport the transport length of the written buffer
-     * @param {Buffer} items[].data the transport length of the written buffer
+     * @param {number} items[].dataTransport the transport of the buffer being written
+     * @param {Buffer} items[].data the buffer to be written
      * @returns {Promise<object>}
      */
     async writeVars(items) {

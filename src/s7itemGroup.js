@@ -75,6 +75,7 @@ class S7ItemGroup extends EventEmitter {
      */
     _initParams() {
         debug('S7ItemGroup _initParams');
+        /** @private @type {Map<string,S7Item>} */
         this._items = new Map();
         this._readPackets = null;
         this._translationCallback = this._defaultTranslationCallback;

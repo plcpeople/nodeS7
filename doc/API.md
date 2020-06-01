@@ -554,8 +554,8 @@ and the response telegrams
 | items[].transport | <code>number</code> | the transport length |
 | items[].address | <code>number</code> | the address where to read from |
 | items[].length | <code>number</code> | the number of elements to read (according to transport) |
-| items[].dataTransport | <code>number</code> | the transport length of the written buffer |
-| items[].data | <code>Buffer</code> | the transport length of the written buffer |
+| items[].dataTransport | <code>number</code> | the transport of the buffer being written |
+| items[].data | <code>Buffer</code> | the buffer to be written |
 
 <a name="S7Endpoint+writeArea"></a>
 

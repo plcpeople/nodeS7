@@ -550,7 +550,7 @@ class S7Connection extends EventEmitter {
 
         //create search index for block types from constants
         const blockTypes = constants.proto.block.subtype;
-        /** @type {Map<number,string>} */
+        /** @private @type {Map<number,string>} */
         const blkTypeIdx = new Map();
         Object.keys(blockTypes).forEach(k => blkTypeIdx.set(blockTypes[k], k));
 
