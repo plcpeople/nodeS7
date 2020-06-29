@@ -2596,6 +2596,9 @@ function stringToS7Addr(addr, useraddr) {
 	if (theItem.datatype === 'DW') {
 		theItem.datatype = 'DWORD';
 	}
+	if (theItem.datatype === 'W') {
+		theItem.datatype = 'WORD';
+	}
 	if (theItem.datatype === 'R') {
 		theItem.datatype = 'REAL';
 	}

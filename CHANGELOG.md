@@ -1,3 +1,7 @@
+Version: 0.3.12
+------------
+- Fix for WORD datatype partially missing
+
 Version: 0.3.11
 ------------
 - Addition of date and time datatypes (thanks to gfcittolin)
