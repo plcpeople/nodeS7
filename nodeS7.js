@@ -327,7 +327,7 @@ NodeS7.prototype.onTCPConnect = function() {
 NodeS7.prototype.onISOConnectReply = function(data) {
 	var self = this;
 	self.isoclient.removeAllListeners('data'); //self.onISOConnectReply);
-	self.isoclient.removeAllListeners('error');
+	//self.isoclient.removeAllListeners('error'); Avoid removing the calback before setting it again
 
 	clearTimeout(self.connectTimeout);
 
@@ -363,7 +363,7 @@ NodeS7.prototype.onISOConnectReply = function(data) {
 	self.isoclient.on('data', function() {
 		self.onPDUReply.apply(self, arguments);
 	});
-
+        self.isoclient.removeAllListeners('error');
 	self.isoclient.on('error', function() {
 		self.readWriteError.apply(self, arguments);
 	});
