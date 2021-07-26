@@ -34,7 +34,10 @@ PLC Support
 
 * Logo 0BA8 PLCs are supported although you should set your local and remote TSAP to match your project, and your addresses have to be specified differently.  DB1,INT0 should get VM0. DB1,INT1118 should get AM1.
 
-* SINAMICS S120 and G120 FW 4.7 and up should work as well, as these drives support direct HMI connection.
+VFD Support
+=======
+
+* SINAMICS S120 and G120 FW 4.7 and up work as well, as these drives support direct connection USING SLOT 0 (instead of other examples that use 1 or 2) and some modified parameter addressing.  This technique can work with these drives with other software as well and is documented on the Siemens website.  Basically, to address parameter number 24, output frequency for example, is defined in the documentation as a real number, so DB24,REAL0 would return the output frequency.  If this parameter were an array, DB24,REAL1 would return the next in sequence even though a Siemens programmer would be tempted to use REAL4 which is not correct in this case.  For this reason, normal S7 optimization must be disabled.  After you declare `conn = new nodes7;` (or similar) then add `conn.doNotOptimize = true;` to ensure this isn't done, and don't try to request these items using array notation as this implies optimization, request REAL0 then REAL1 etc.
 
 Credit to the S7 Wireshark dissector plugin for help understanding why things were not working.
 (http://sourceforge.net/projects/s7commwireshark/)
@@ -56,7 +59,9 @@ var variables = {
       TEST5: 'DB1,REAL4',    // Single real value
       TEST6: 'DB1,REAL8',    // Another single real value
       TEST7: 'DB1,INT12.2',  // Two integer value array
-      TEST8: 'DB1,LREAL4'    // Single 8-byte real value
+      TEST8: 'DB1,LREAL4',   // Single 8-byte real value
+      TEST9: 'DB1,X14.0',    // Single bit in a data block
+      TEST10: 'DB1,X14.0.8'  // Array of 8 bits in a data block
 };
 
 conn.initiateConnection({ port: 102, host: '192.168.0.2', rack: 0, slot: 1 }, connected); // slot 2 for 300/400, slot 1 for 1200/1500
@@ -154,6 +159,8 @@ If you use it, `translator` should be a function that takes a string as an argum
 - DB10,INT6 - DB10.DBW6 as INT
 - DB10,I6 -same as above
 - DB10,INT6.2 - DB10.DBW6 and DB10.DBW8 in an array with length 2
+- DB10,X14.0 - DB10.DBX14.0 as BOOL
+- DB10,X14.0.8 - DB10.DBB14 as an array of 8 BOOL
 - PIW30 - PIW30 as INT
 - DB10,S20.30 - String at offset 20 with length of 30 (actual array length 32 due to format of String type, length byte will be read/written)
 - DB10,S20.30.3 - Array of 3 strings at offset 20, each with length of 30 (actual array length 32 due to format of String type, length byte will be read/written)
