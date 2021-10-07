@@ -1626,6 +1626,11 @@ function processS7Packet(theData, theItem, thePointer, theCID) {
 	if (typeof (theData) === "undefined") {
 		remainingLength = 0;
 		outputLog("Processing an undefined packet, likely due to timeout error", 0, theCID);
+	} else if (isNaN(theItem.byteLength)) {
+		// byteLength Nan should probably never reach this method.
+		// This temporal fix avoids the library crashing
+		outputLog("Processing an undefined packet, perhaps bad input?", 0, theCID);
+		return 0;
 	} else {
 		remainingLength = theData.length - thePointer;  // Say if length is 39 and pointer is 35 we can access 35,36,37,38 = 4 bytes.
 	}
