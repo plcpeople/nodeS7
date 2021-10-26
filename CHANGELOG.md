@@ -1,3 +1,8 @@
+Version: 0.3.13
+------------
+- Fix for error ECONNRESET (thanks to adopozo)
+- Documentation improvements including G120 drive support documentation (thanks to aurelien49 for testing this)
+
 Version: 0.3.12
 ------------
 - Fix for WORD datatype partially missing
