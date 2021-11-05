@@ -136,6 +136,9 @@ NodeS7.prototype.initiateConnection = function(cParam, callback) {
 	} else {
 		self.connectionID = cParam.connection_name;
 	}
+	if (typeof (cParam.doNotOptimize) !== 'undefined') {
+		self.doNotOptimize = cParam.doNotOptimize;
+	}
 	self.connectionParams = cParam;
 	self.connectCallback = callback;
 	self.connectCBIssued = false;
@@ -2593,7 +2596,7 @@ function stringToS7Addr(addr, useraddr) {
 	if (theItem.datatype === 'I') {
 		theItem.datatype = 'INT';
 	}
-	if (theItem.datatype === 'DW') {
+	if (theItem.datatype === 'DW' || theItem.datatype === 'DWT') {
 		theItem.datatype = 'DWORD';
 	}
 	if (theItem.datatype === 'W') {

@@ -37,7 +37,7 @@ PLC Support
 VFD Support
 =======
 
-* SINAMICS S120 and G120 FW 4.7 and up work as well, as these drives support direct connection USING SLOT 0 (instead of other examples that use 1 or 2) and some modified parameter addressing.  This technique can work with these drives with other software as well and is documented on the Siemens website.  Basically, to address parameter number 24, output frequency for example, is defined in the documentation as a real number, so DB24,REAL0 would return the output frequency.  If this parameter were an array, DB24,REAL1 would return the next in sequence even though a Siemens programmer would be tempted to use REAL4 which is not correct in this case.  For this reason, normal S7 optimization must be disabled.  After you declare `conn = new nodes7;` (or similar) then add `conn.doNotOptimize = true;` to ensure this isn't done, and don't try to request these items using array notation as this implies optimization, request REAL0 then REAL1 etc.
+* SINAMICS S120 and G120 FW 4.7 and up work as well, as these drives support direct connection USING SLOT 0 (instead of other examples that use 1 or 2) and some modified parameter addressing.  This technique can work with these drives with other software as well and is documented on the Siemens website.  Basically, to address parameter number 24, output frequency for example, is defined in the documentation as a real number, so DB24,REAL0 would return the output frequency.  If this parameter were an array, DB24,REAL1 would return the next in sequence even though a Siemens programmer would be tempted to use REAL4 which is not correct in this case.  For this reason, normal S7 optimization must be disabled.  After you declare `conn = new nodes7;` (or similar) then add `conn.doNotOptimize = true;` to ensure this isn't done, and don't try to request these items using array notation as this implies optimization, request REAL0 then REAL1 etc.  doNotOptimize is now also supported as a connection parameter.
 
 Credit to the S7 Wireshark dissector plugin for help understanding why things were not working.
 (http://sourceforge.net/projects/s7commwireshark/)
@@ -65,7 +65,7 @@ var variables = {
 };
 
 conn.initiateConnection({ port: 102, host: '192.168.0.2', rack: 0, slot: 1 }, connected); // slot 2 for 300/400, slot 1 for 1200/1500
-// conn.initiateConnection({port: 102, host: '192.168.0.2', localTSAP: 0x0100, remoteTSAP: 0x0200, timeout: 8000}, connected);
+// conn.initiateConnection({port: 102, host: '192.168.0.2', localTSAP: 0x0100, remoteTSAP: 0x0200, timeout: 8000, doNotOptimize: true}, connected);
 // local and remote TSAP can also be directly specified instead. The timeout option specifies the TCP timeout.
 
 function connected(err) {

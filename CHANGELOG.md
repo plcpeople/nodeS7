@@ -1,3 +1,8 @@
+Version: 0.3.14
+------------
+- Allows DWT as well as DW for type specifier for compatibility with some OPC server tag file export format
+- Allows doNotOptimize as a connection parameter (it defaults to false, should be set to true for G120 drives)
+
 Version: 0.3.13
 ------------
 - Fix for error ECONNRESET (thanks to adopozo)
