@@ -1,3 +1,7 @@
+Version: 0.3.15
+------------
+- Check for NaN byte length causing crash in processS7Packet (thanks to cstim)
+
 Version: 0.3.14
 ------------
 - Allows DWT as well as DW for type specifier for compatibility with some OPC server tag file export format
