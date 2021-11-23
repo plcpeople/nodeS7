@@ -196,7 +196,7 @@ NodeS7.prototype.connectNow = function(cParam) {
 
         self.isoclient.setTimeout(cParam.timeout || 5000, () => {                                                                                                                    
             self.isoclient.destroy();                                                                                                                                            
-            self.connectError.apply(self, arguments);                                                                                                                            
+            self.connectError.apply(self, [{ code: 'EUSERTIMEOUT' }]); // Former use of "arguments" was always going to be 0.  Use "USERTIMEOUT" to show difference between this and TCP timeout.                                                                                                                            
         });                                                                                                                                                                          
 
         self.isoclient.once('connect', () => {                                                                                                                                       
