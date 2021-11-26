@@ -1,3 +1,7 @@
+Version: 0.3.16
+------------
+- Return error on timeout based on timer, similar to what is seen if there is a real TCP timeout
+
 Version: 0.3.15
 ------------
 - Check for NaN byte length causing crash in processS7Packet (thanks to cstim)
