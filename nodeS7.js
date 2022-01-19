@@ -68,7 +68,7 @@ function NodeS7(opts) {
 	self.writeDoneCallback = undefined;
 	self.connectTimeout = undefined;
 	self.PDUTimeout = undefined;
-	self.globalTimeout = 1500; // In many use cases we will want to increase this
+	self.globalTimeout = opts.globalTimeout || 1500;
 
 	self.rack = 0;
 	self.slot = 2;
