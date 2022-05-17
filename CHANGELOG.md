@@ -1,3 +1,7 @@
+Version: 0.3.17
+------------
+- Modify the globalTimeout variable when timeout is specified as a connection parameter
+
 Version: 0.3.16
 ------------
 - Return error on timeout based on timer, similar to what is seen if there is a real TCP timeout

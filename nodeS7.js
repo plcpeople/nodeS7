@@ -69,7 +69,7 @@ function NodeS7(opts) {
 	self.connectTimeout = undefined;
 	self.PDUTimeout = undefined;
 	self.globalTimeout = 1500; // In many use cases we will want to increase this
-
+        // In 0.3.17 this was made variable from cParam.timeout to ensure packets don't timeout at 1500ms if the user has specified a timeout externally.
 	self.rack = 0;
 	self.slot = 2;
 	self.localTSAP = null;
@@ -138,6 +138,9 @@ NodeS7.prototype.initiateConnection = function(cParam, callback) {
 	}
 	if (typeof (cParam.doNotOptimize) !== 'undefined') {
 		self.doNotOptimize = cParam.doNotOptimize;
+	}
+	if (typeof (cParam.timeout) !== 'undefined') { // Added in 0.3.17 to ensure packets don't timeout at 1500ms if the user has specified a timeout externally.
+		self.globalTimeout = cParam.timeout;
 	}
 	self.connectionParams = cParam;
 	self.connectCallback = callback;
