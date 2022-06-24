@@ -79,7 +79,8 @@ function connected(err) {
   conn.addItems('TEST6');
   // conn.removeItems(['TEST2', 'TEST3']); // We could do this.
   // conn.writeItems(['TEST5', 'TEST6'], [ 867.5309, 9 ], valuesWritten); // You can write an array of items as well.
-  conn.writeItems('TEST7', [666, 777], valuesWritten); // You can write a single array item too.
+  // conn.writeItems('TEST7', [666, 777], valuesWritten); // You can write a single array item too.
+  conn.writeItems('TEST3', true, valuesWritten); // This writes a single boolean item (one bit) to true
   conn.readAllItems(valuesReady);
 }
 
