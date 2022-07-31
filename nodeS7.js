@@ -464,14 +464,14 @@ NodeS7.prototype.writeItems = function(arg, value, cb) {
 	self.instantWriteBlockList = []; // Initialize the array.
 
 	if (typeof arg === "string") {
-		self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
+		self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg), arg, self.connectionParams));
 		if (typeof (self.instantWriteBlockList[self.instantWriteBlockList.length - 1]) !== "undefined") {
 			self.instantWriteBlockList[self.instantWriteBlockList.length - 1].writeValue = value;
 		}
 	} else if (Array.isArray(arg) && Array.isArray(value) && (arg.length == value.length)) {
 		for (i = 0; i < arg.length; i++) {
 			if (typeof arg[i] === "string") {
-				self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
+				self.instantWriteBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i], self.connectionParams));
 				if (typeof (self.instantWriteBlockList[self.instantWriteBlockList.length - 1]) !== "undefined") {
 					self.instantWriteBlockList[self.instantWriteBlockList.length - 1].writeValue = value[i];
 				}
@@ -519,11 +519,11 @@ NodeS7.prototype.addItemsNow = function(arg) {
 	var self = this, i;
 	outputLog("Adding " + arg, 0, self.connectionID);
 	if (typeof (arg) === "string" && arg !== "_COMMERR") {
-		self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg), arg));
+		self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg), arg, self.connectionParams));
 	} else if (Array.isArray(arg)) {
 		for (i = 0; i < arg.length; i++) {
 			if (typeof (arg[i]) === "string" && arg[i] !== "_COMMERR") {
-				self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i]));
+				self.polledReadBlockList.push(stringToS7Addr(self.translationCB(arg[i]), arg[i], self.connectionParams));
 			}
 		}
 	}
@@ -972,6 +972,11 @@ NodeS7.prototype.sendReadPacket = function() {
 	var self = this, i, j, flagReconnect = false;
 
 	outputLog("SendReadPacket called", 1, self.connectionID);
+
+	if (!self.readPacketArray.length && (typeof(self.readDoneCallback) === "function")) {
+		// Call back the callback if we are being asked for zero tags - for consistency
+		self.readDoneCallback(false, {}); // Data is second argument and shouldn't be undefined
+	}
 
 	for (i = 0; i < self.readPacketArray.length; i++) {
 		if (self.readPacketArray[i].sent) { continue; }
@@ -2307,7 +2312,7 @@ function bufferizeS7Item(theItem) {
 	return undefined;
 }
 
-function stringToS7Addr(addr, useraddr) {
+function stringToS7Addr(addr, useraddr, cParam) {
 	"use strict";
 	var theItem, splitString, splitString2;
 
@@ -2607,6 +2612,13 @@ function stringToS7Addr(addr, useraddr) {
 	if (theItem.datatype === 'DW' || theItem.datatype === 'DWT') {
 		theItem.datatype = 'DWORD';
 	}
+	if (theItem.datatype === 'WDT') {
+		if (cParam.wdtAsUTC) {
+			theItem.datatype = 'DTZ';
+		} else {
+			theItem.datatype = 'DT';
+		}
+	}
 	if (theItem.datatype === 'W') {
 		theItem.datatype = 'WORD';
 	}
@@ -2869,5 +2881,7 @@ function outputLog(txt, debugLevel, id) {
 	} else {
 		idtext = ' ' + id;
 	}
-	if (typeof (debugLevel) === 'undefined' || effectiveDebugLevel >= debugLevel) { console.log('[' + process.hrtime() + idtext + '] ' + util.format(txt)); }
+	if (typeof (debugLevel) === 'undefined' || effectiveDebugLevel >= debugLevel) {
+		console.log('[' + process.hrtime() + idtext + '] ' + util.format(txt));
+	}
 }

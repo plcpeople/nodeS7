@@ -1,3 +1,8 @@
+Version: 0.3.18
+------------
+- Add support for WDT to specify date/time which can be either UTC or local time depending on a connection parameter
+- Call back readDoneCallback even when asked to read no valid tags
+
 Version: 0.3.17
 ------------
 - Modify the globalTimeout variable when timeout is specified as a connection parameter
