@@ -1994,6 +1994,17 @@ function processS7ReadItem(theItem) {
 						}
 						theItem.value.push(tempString);
 						break;
+					case "WS":
+					case "WSTRING":
+						strlen = theItem.byteBuffer.readUInt16BE(thePointer+2);
+						tempString = '';
+						for (var charOffset = 4; charOffset < theItem.dtypelen && (charOffset - 4) < (strlen*2); charOffset+=2) {
+							// say strlen = 1 (one-wchar string) this char is at arrayIndex of 4.
+							// Convert to string.
+							tempString += String.fromCharCode(theItem.byteBuffer.readUInt16BE(thePointer+charOffset));
+						}
+						theItem.value.push(tempString);
+						break;
 					case "C":
 					case "CHAR":
 						// Convert to string.
@@ -2081,6 +2092,16 @@ function processS7ReadItem(theItem) {
 						// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
 						// Convert to string.
 						theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt8(thePointer+charOffset));
+					}
+					break;
+				case "WS":
+				case "WSTRING":
+					strlen = theItem.byteBuffer.readUInt16BE(thePointer+2);
+					theItem.value = '';
+					for (var charOffset = 4; charOffset < theItem.dtypelen && (charOffset - 4) < (strlen*2); charOffset+=2) {
+						// say strlen = 1 (one-char string) this char is at arrayIndex of 2.
+						// Convert to string.
+						theItem.value += String.fromCharCode(theItem.byteBuffer.readUInt16BE(thePointer+charOffset));
 					}
 					break;
 				case "C":
@@ -2209,6 +2230,19 @@ function bufferizeS7Item(theItem) {
 						}
 					}
 					break;
+				case "WS":
+				case "WSTRING":
+					// Convert to bytes.
+					theItem.writeBuffer.writeUInt16BE(theItem.dtypelen - 4, thePointer); // Array length is requested val, -2 is string length
+					theItem.writeBuffer.writeUInt16BE(Math.min(theItem.dtypelen - 4, theItem.writeValue[arrayIndex].length), thePointer+1); // Array length is requested val, -2 is string length
+					for (var charOffset = 4; charOffset < theItem.dtypelen; charOffset+=2) {
+						if (charOffset < (theItem.writeValue[arrayIndex].length + 4)) {
+							theItem.writeBuffer.writeUInt16BE(theItem.writeValue[arrayIndex].charCodeAt(charOffset-4), thePointer+charOffset);
+						} else {
+							theItem.writeBuffer.writeUInt16BE(32, thePointer+charOffset); // write space
+						}
+					}
+					break;
 				case "TIMER":
 				case "COUNTER":
 					// I didn't think we supported arrays of timers and counters.
@@ -2299,6 +2333,20 @@ function bufferizeS7Item(theItem) {
 					}
 				}
 				break;
+			case "WS":
+			case "WSTRING":
+				// Convert to bytes.
+				theItem.writeBuffer.writeUInt16BE(theItem.dtypelen - 4, thePointer); // Array length is requested val, -4 is string length
+				theItem.writeBuffer.writeUInt16BE(Math.min(theItem.dtypelen - 4, theItem.writeValue.length), thePointer+2); // Array length is requested val, -4 is string length
+
+				for (var charOffset = 4; charOffset < theItem.dtypelen; charOffset+=2) {
+					if (charOffset < (theItem.writeValue.length + 4)) {
+						theItem.writeBuffer.writeUInt16BE(theItem.writeValue.charCodeAt(charOffset-4), thePointer+charOffset);
+					} else {
+						theItem.writeBuffer.writeUInt16BE(32, thePointer+charOffset); // write space
+					}
+				}
+				break;
 			case "TIMER":
 			case "COUNTER":
 				theItem.writeBuffer.writeInt16BE(theItem.writeValue, thePointer);
@@ -2331,10 +2379,10 @@ function stringToS7Addr(addr, useraddr, cParam) {
 		theItem.datatype = splitString2[0].replace(/[0-9]/gi, '').toUpperCase(); // Clear the numbers
 		if (theItem.datatype === 'X' && splitString2.length === 3) {
 			theItem.arrayLength = parseInt(splitString2[2], 10);
-		} else if ((theItem.datatype === 'S' || theItem.datatype === 'STRING') && splitString2.length === 3) {
+		} else if ((theItem.datatype === 'S' || theItem.datatype === 'STRING' || theItem.datatype === 'WS' || theItem.dataType === 'WSTRING') && splitString2.length === 3) {
 			theItem.dtypelen = parseInt(splitString2[1], 10) + 2; // With strings, add 2 to the length due to S7 header
 			theItem.arrayLength = parseInt(splitString2[2], 10);  // For strings, array length is now the number of strings
-		} else if ((theItem.datatype === 'S' || theItem.datatype === 'STRING') && splitString2.length === 2) {
+		} else if ((theItem.datatype === 'S' || theItem.datatype === 'STRING' || theItem.datatype === 'WS' || theItem.dataType === 'WSTRING') && splitString2.length === 2) {
 			theItem.dtypelen = parseInt(splitString2[1], 10) + 2; // With strings, add 2 to the length due to S7 header
 			theItem.arrayLength = 1;
 		} else if (theItem.datatype !== 'X' && splitString2.length === 2) {
@@ -2662,6 +2710,8 @@ function stringToS7Addr(addr, useraddr, cParam) {
 			break;
 		case "S":
 		case "STRING":
+		case "WS":
+		case "WSTRING":
 			// For strings, arrayLength and dtypelen were assigned during parsing.
 			break;
 		default:
@@ -2824,6 +2874,8 @@ function S7Item() { // Object
 			case "CHAR":
 			case "S":
 			case "STRING":
+			case "WS":
+			case "WSTRING":
 				// Convert to string.
 				return "";
 			default:
